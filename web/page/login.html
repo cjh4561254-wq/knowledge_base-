@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<!--
+  真实登录页 · 视觉基准: demo-preview/schemes/05-stripe.login.html (方案 05 · Stripe Checkout 表单手感)
+  设计系统要点:
+    1) 左右分屏 · 左半静态多层 radial-gradient mesh 品牌区(无 blur/无位移动画, 本机预览浏览器无 GPU),
+       右半白底卡片表单区, ≤900px 上下堆叠。
+    2) 丝滑表单过渡 · floating label(cubic-bezier(0,1.8,1,1.8) 轻回弹) + focus 外发光 ring +
+       合法绿勾 scale 弹入 + 错误 max-height/opacity 展开, 全程零布局抖动。
+    3) Stripe 三层柔和阴影卡片 + 主色 #635BFF + 信任徽章行(锁/SOC2/私有化)。
+  对接后端: POST /login (JSON) · GET /api/me (加载即探测已登录) · 尊重 ?next= 站内白名单跳转。
+  零外部资源: 无 CDN / 无网络字体 / 无外链图; 单文件内联 CSS/JS。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex">
+<title>登录 · BOSS智库知识库</title>
+<style>
+  :root{
+    /* 共享设计 token(与另两个页面同源) */
+    --blurple:#635BFF; --blurple-deep:#4F46E5; --cyan:#00D4FF; --purple:#A960FF; --pink:#FF5C99;
+    --ink:#0A2540; --sub:#425466; --body:#1A1F36; --page:#FFFFFF; --page-alt:#F6FBFF;
+    --ok:#0ED47E; --err:#DF1B51; --line:rgba(10,37,64,.10); --line-soft:rgba(10,37,64,.06);
+    --r-sm:8px; --r-md:10px; --r-lg:12px;
+    --sh:0 1px 2px rgba(10,37,64,.06), 0 8px 24px rgba(10,37,64,.08), 0 24px 48px rgba(10,37,64,.06);
+    --sh-hover:0 1px 2px rgba(10,37,64,.06), 0 14px 36px rgba(10,37,64,.14), 0 28px 56px rgba(10,37,64,.08);
+    --sans:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    --mono:"SFMono-Regular",Consolas,"Cascadia Mono",monospace;
+
+    /* 页面局部派生量 */
+    --field-line:#E6EBF1;          /* 输入框默认边框(focus 时→ --blurple) */
+    --field-line-strong:#cfd8e3;
+    --bg-soft:#F6FBFF;             /* = --page-alt, 悬停/浅色底 */
+    --ring:0 0 0 4px rgba(99,91,255,.14);
+    --ring-err:0 0 0 4px rgba(223,27,81,.14);
+    --ease-back:cubic-bezier(0,1.8,1,1.8);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--sans);
+    color:var(--body);
+    background:var(--page-alt);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+  }
+  a{color:var(--blurple);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  button{font-family:inherit;}
+
+  /* ---------- 布局骨架 ---------- */
+  .page{display:flex;min-height:100vh;width:100%;}
+
+  /* ---------- 左侧 mesh 品牌区 (纯静态多层 radial-gradient, 无 blur/无 keyframe 位移) ---------- */
+  .brand{
+    position:relative;
+    flex:0 0 46%;
+    max-width:46%;
+    overflow:hidden;
+    color:#fff;
+    background:
+      radial-gradient(62% 52% at 14% 18%, rgba(99,91,255,.92), transparent 62%),
+      radial-gradient(54% 46% at 88% 12%, rgba(0,212,255,.62), transparent 60%),
+      radial-gradient(60% 58% at 82% 82%, rgba(169,96,255,.60), transparent 64%),
+      radial-gradient(52% 48% at 16% 88%, rgba(255,92,153,.52), transparent 60%),
+      linear-gradient(150deg,#0a2540 0%, #0b1e3a 55%, #140b3a 100%);
+  }
+  .brand::after{                                   /* 细网格质感叠层(静态, 极低透明度) */
+    content:"";position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+    background-size:44px 44px;
+    -webkit-mask-image:radial-gradient(120% 100% at 30% 20%, #000 30%, transparent 78%);
+    mask-image:radial-gradient(120% 100% at 30% 20%, #000 30%, transparent 78%);
+    pointer-events:none;
+  }
+  .brand-inner{
+    position:relative;z-index:1;
+    display:flex;flex-direction:column;height:100%;
+    padding:56px 52px;gap:28px;
+  }
+  .logo-row{display:flex;align-items:center;gap:12px;}
+  .logo-mark{
+    width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  .logo-word{font-size:19px;font-weight:700;letter-spacing:.3px;}
+  .brand-hero{margin-top:14px;}
+  .brand-hero h1{
+    font-size:clamp(28px,3.4vw,42px);line-height:1.18;margin:0 0 12px;
+    font-weight:800;letter-spacing:-.5px;
+  }
+  .brand-hero p{margin:0;max-width:34ch;font-size:15px;color:rgba(226,232,240,.86);}
+  .quotes{display:flex;flex-direction:column;gap:16px;margin-top:6px;}
+  .quote{
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    border-radius:var(--r-lg);padding:16px 18px;
+  }
+  .quote p{margin:0 0 8px;font-size:14px;color:#eef2f7;}
+  .quote span{font-size:12.5px;color:rgba(203,213,224,.9);}
+  .quote b{color:#fff;font-weight:600;}
+  .cust-logos{margin-top:auto;}
+  .cust-logos .lbl{
+    font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:rgba(203,213,224,.7);margin-bottom:12px;
+  }
+  .logo-strip{display:flex;align-items:center;gap:26px;flex-wrap:wrap;opacity:.85;}
+  .logo-strip svg{display:block;}
+
+  /* ---------- 右侧表单区 ---------- */
+  .form-side{
+    flex:1 1 54%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:48px 32px;
+    background:
+      radial-gradient(80% 60% at 100% 0%, rgba(99,91,255,.06), transparent 60%),
+      var(--page);
+  }
+  .card{
+    width:100%;max-width:412px;background:var(--page);
+    border:1px solid var(--line);border-radius:var(--r-lg);
+    box-shadow:var(--sh);padding:34px 32px 30px;position:relative;
+    transition:box-shadow .22s ease;
+  }
+  .card-head h2{margin:0 0 6px;font-size:23px;font-weight:700;color:var(--ink);}
+  .card-head p{margin:0 0 22px;font-size:14px;color:var(--sub);}
+
+  /* 通用提示条(服务器 error / 成功态): max-height+opacity 展开, 零抖动 */
+  .notice{
+    max-height:0;opacity:0;overflow:hidden;
+    border-radius:var(--r-md);
+    transition:max-height .24s ease, opacity .2s ease, margin .24s ease, padding .24s ease;
+    font-size:13.5px;padding:0 14px;border:1px solid transparent;
+  }
+  .notice.show{max-height:96px;opacity:1;margin-bottom:16px;padding:11px 14px;}
+  .notice.is-error{color:var(--err);background:rgba(223,27,81,.06);border-color:rgba(223,27,81,.28);}
+  .notice.is-ok{color:#047848;background:rgba(14,212,126,.08);border-color:rgba(14,212,126,.4);}
+  .notice b{font-weight:700;}
+
+  .field{position:relative;margin-bottom:16px;}
+  .field .box{
+    position:relative;border:1.5px solid var(--field-line);border-radius:var(--r-md);
+    background:var(--page);
+    transition:border-color .15s ease, box-shadow .18s ease, background-color .18s ease;
+  }
+  .field .box::before{
+    content:"";position:absolute;inset:0;border-radius:var(--r-md);
+    box-shadow:var(--ring);opacity:0;transition:opacity .18s ease;pointer-events:none;
+  }
+  .field input{
+    width:100%;height:56px;border:0;background:transparent;outline:none;
+    padding:24px 76px 8px 16px;font-size:15px;color:var(--ink);border-radius:var(--r-md);
+    display:block;
+  }
+  .field label{
+    position:absolute;left:16px;top:18px;font-size:15px;color:var(--sub);
+    transform-origin:left center;pointer-events:none;
+    transition:transform .2s var(--ease-back), top .2s var(--ease-back), color .15s ease;
+  }
+  .field input:focus + label,
+  .field input:not(:placeholder-shown) + label{top:9px;transform:scale(.76);color:var(--sub);}
+  .field .box:focus-within{border-color:var(--blurple);}
+  .field .box:focus-within::before{opacity:1;}
+  .field .box:focus-within input:focus + label{color:var(--blurple);}
+
+  /* 合法绿勾 scale 弹入 */
+  .tick{
+    position:absolute;right:16px;top:50%;width:20px;height:20px;
+    transform:translateY(-50%) scale(0);opacity:0;
+    transition:transform .28s var(--ease-back), opacity .18s ease;pointer-events:none;
+  }
+  .field.valid .tick{transform:translateY(-50%) scale(1);opacity:1;}
+
+  /* 密码显隐按钮 */
+  .pw-toggle{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    width:32px;height:32px;border:0;background:transparent;display:grid;place-items:center;
+    cursor:pointer;border-radius:var(--r-sm);color:var(--sub);
+    transition:background-color .15s ease,color .15s ease;
+  }
+  .pw-toggle:hover{background:var(--bg-soft);color:var(--ink);}
+  .pw-toggle:focus-visible{outline:none;box-shadow:var(--ring);}
+  .field.has-pw .tick{right:44px;}
+
+  /* 字段级错误态 */
+  .field.error .box{border-color:var(--err);}
+  .field.error .box::before{box-shadow:var(--ring-err);opacity:1;}
+  .field.error .box:focus-within{border-color:var(--err);}
+  .err-msg{
+    display:block;max-height:0;opacity:0;overflow:hidden;
+    font-size:12.5px;color:var(--err);padding-left:16px;
+    transition:max-height .22s ease, opacity .2s ease, margin .22s ease;
+  }
+  .field.error .err-msg{max-height:44px;opacity:1;margin-top:6px;}
+
+  .row-between{
+    display:flex;align-items:center;justify-content:space-between;
+    margin:4px 2px 22px;font-size:13.5px;
+  }
+  .remember{display:inline-flex;align-items:center;gap:9px;cursor:pointer;color:var(--sub);user-select:none;}
+  .remember input{position:absolute;opacity:0;width:0;height:0;}
+  .cbox{
+    width:18px;height:18px;border-radius:5px;border:1.5px solid var(--field-line-strong);
+    display:grid;place-items:center;background:var(--page);
+    transition:border-color .15s ease,background-color .15s ease;
+  }
+  .cbox svg{opacity:0;transform:scale(.5);transition:opacity .15s ease,transform .18s var(--ease-back);}
+  .remember input:checked + .cbox{border-color:var(--blurple);background:var(--blurple);}
+  .remember input:checked + .cbox svg{opacity:1;transform:scale(1);}
+  .remember input:focus-visible + .cbox{box-shadow:var(--ring);}
+
+  .link-btn{
+    border:0;background:transparent;padding:2px 4px;margin:0;cursor:pointer;
+    color:var(--blurple);font-size:13.5px;font-weight:600;border-radius:6px;
+    text-decoration:none;font-family:inherit;
+  }
+  .link-btn:hover{text-decoration:underline;}
+  .link-btn:focus-visible{outline:none;box-shadow:var(--ring);}
+
+  /* 主 CTA */
+  .cta{
+    position:relative;width:100%;height:50px;border:0;border-radius:var(--r-md);
+    background:linear-gradient(180deg,#6b63ff 0%, var(--blurple) 100%);
+    color:#fff;font-size:15.5px;font-weight:600;cursor:pointer;
+    box-shadow:0 6px 16px rgba(99,91,255,.32);
+    transition:transform .12s ease, box-shadow .2s ease, filter .2s ease;overflow:hidden;
+  }
+  .cta .cta-label{transition:opacity .2s ease;display:inline-flex;align-items:center;gap:8px;}
+  .cta:hover{box-shadow:0 10px 22px rgba(99,91,255,.42);filter:saturate(1.05);}
+  .cta:focus-visible{outline:none;box-shadow:0 0 0 3px #fff,var(--ring),0 6px 16px rgba(99,91,255,.32);}
+  .cta:active{transform:translateY(1px);}
+  .cta:disabled{cursor:default;}
+  .cta.loading{cursor:default;}
+  .cta.loading .cta-label{opacity:0;}
+  .cta .spinner{
+    position:absolute;inset:0;margin:auto;width:22px;height:22px;
+    border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;
+    opacity:0;transition:opacity .2s ease;
+  }
+  .cta.loading .spinner{opacity:1;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* 分隔线 */
+  .divider{display:flex;align-items:center;gap:14px;margin:22px 0 16px;color:var(--sub);font-size:12.5px;}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line);}
+
+  /* 第三方登录(全部禁用) */
+  .oauth{display:flex;gap:12px;}
+  .oauth button{
+    flex:1 1 0;display:flex;align-items:center;justify-content:center;height:46px;
+    border:1.5px solid var(--field-line);border-radius:var(--r-md);background:var(--page);
+    color:var(--ink);cursor:not-allowed;
+    transition:border-color .15s ease,box-shadow .18s ease;
+  }
+  .oauth button svg{width:22px;height:22px;display:block;opacity:.42;}
+  .oauth button:focus-visible{outline:none;border-color:var(--blurple);box-shadow:var(--ring);}
+  .oauth-note{
+    margin:10px 2px 0;font-size:12px;color:var(--sub);text-align:center;
+  }
+
+  .aux{margin-top:20px;text-align:center;font-size:13px;color:var(--sub);}
+  .aux .link-btn{font-weight:600;}
+
+  /* 忘记密码 / 联系管理员 诚实说明浮层 */
+  .note-pop{
+    position:absolute;z-index:20;width:290px;max-width:calc(100% - 24px);
+    background:var(--page);border:1px solid var(--line);border-radius:var(--r-md);
+    box-shadow:var(--sh-hover);padding:14px 16px;font-size:13px;color:var(--sub);
+    opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;
+    transition:opacity .18s ease, transform .18s ease;
+  }
+  .note-pop.show{opacity:1;transform:none;pointer-events:auto;}
+  .note-pop strong{display:block;color:var(--ink);font-size:13.5px;margin-bottom:6px;}
+  .note-pop code{
+    font-family:var(--mono);font-size:12px;color:var(--blurple-deep);
+    background:rgba(99,91,255,.08);border-radius:6px;padding:2px 6px;display:inline-block;
+    margin-top:4px;word-break:break-all;
+  }
+  .note-pop .close{
+    position:absolute;top:6px;right:6px;width:26px;height:26px;border:0;background:transparent;
+    cursor:pointer;color:var(--sub);border-radius:var(--r-sm);display:grid;place-items:center;
+  }
+  .note-pop .close:hover{background:var(--bg-soft);color:var(--ink);}
+  .note-pop .close:focus-visible{outline:none;box-shadow:var(--ring);}
+
+  /* 信任徽章行 */
+  .trust{
+    display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;
+    margin-top:26px;font-size:12.5px;color:var(--sub);
+  }
+  .trust span{display:inline-flex;align-items:center;gap:7px;}
+  .trust svg{width:15px;height:15px;color:var(--blurple);}
+  .copyright{margin-top:22px;text-align:center;font-size:12px;color:#8a97a8;}
+
+  /* ---------- 响应式四档 ---------- */
+  @media (max-width:1024px){
+    .brand-inner{padding:44px 40px;}
+    .brand{flex-basis:44%;max-width:44%;}
+  }
+  @media (max-width:900px){
+    .page{flex-direction:column;}
+    .brand{flex:0 0 auto;max-width:100%;}
+    .brand-inner{padding:40px 30px 34px;gap:22px;min-height:auto;}
+    .cust-logos{margin-top:8px;}
+    .form-side{padding:38px 20px 44px;}
+  }
+  @media (max-width:768px){
+    .quotes{gap:14px;}
+    .brand-inner{padding:36px 26px 30px;}
+  }
+  @media (max-width:560px){
+    .brand-hero h1{font-size:26px;}
+    .quotes{gap:12px;}
+    .card{padding:26px 20px 24px;}
+    .trust{gap:14px;}
+  }
+  @media (max-width:390px){
+    .brand-inner{padding:32px 22px 28px;}
+    .form-side{padding:30px 16px 40px;}
+    .row-between{font-size:13px;}
+    .oauth{gap:8px;}
+    .oauth button{height:44px;}
+    .oauth svg,.oauth button svg{width:20px;height:20px;}
+    .field input{padding-right:70px;}
+    .copyright{font-size:11px;}
+    .note-pop{width:260px;}
+  }
+
+  /* 降低动态偏好降级 */
+  @media (prefers-reduced-motion:reduce){
+    *{transition-duration:.001ms !important;animation-duration:.001ms !important;animation-iteration-count:1 !important;}
+    .cta.loading .spinner{animation:none;}        /* spinner 静止但仍可见 */
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <!-- ============ 左侧 mesh 品牌区 ============ -->
+    <aside class="brand">
+      <div class="brand-inner">
+        <div class="logo-row">
+          <div class="logo-mark" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M5 5h6a3.2 3.2 0 0 1 0 6.4H5zM5 11.4h6.6a3.3 3.3 0 0 1 0 6.6H5z" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="logo-word">BOSS智库知识库</div>
+        </div>
+
+        <div class="brand-hero">
+          <h1>让团队知识<br>在对话中自由流动</h1>
+          <p>统一检索、可追溯引用、私有化部署——为每一位同事提供可信赖的智能问答。</p>
+        </div>
+
+        <div class="quotes">
+          <div class="quote">
+            <p>“文档导入后十分钟就能问，引用来源清清楚楚，客服同事再不用翻群记录了。”</p>
+            <span>— <b>陈薇</b> · 某消费品牌 客服负责人</span>
+          </div>
+          <div class="quote">
+            <p>“私有化部署让我们敢把内部资料放进来，权限和数据都在自己手里。”</p>
+            <span>— <b>李骁</b> · 智能制造 信息化总监</span>
+          </div>
+          <div class="quote">
+            <p>“阶段进度把每一步都摊开，答案可核对，团队对 AI 的信任一下就建立起来了。”</p>
+            <span>— <b>王衡</b> · 跨境电商 运营经理</span>
+          </div>
+        </div>
+
+        <div class="cust-logos">
+          <div class="lbl">深受团队信赖</div>
+          <div class="logo-strip" aria-hidden="true">
+            <svg width="70" height="24" viewBox="0 0 70 24"><circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="1.6"/><rect x="26" y="7" width="40" height="4" rx="2" fill="#fff" opacity=".8"/><rect x="26" y="14" width="28" height="4" rx="2" fill="#fff" opacity=".55"/></svg>
+            <svg width="66" height="24" viewBox="0 0 66 24"><path d="M6 18 12 6l6 12z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><rect x="26" y="8" width="34" height="4" rx="2" fill="#fff" opacity=".78"/><rect x="26" y="14" width="22" height="4" rx="2" fill="#fff" opacity=".5"/></svg>
+            <svg width="70" height="24" viewBox="0 0 70 24"><rect x="5" y="5" width="14" height="14" rx="4" fill="none" stroke="#fff" stroke-width="1.6"/><rect x="28" y="8" width="36" height="4" rx="2" fill="#fff" opacity=".8"/><rect x="28" y="14" width="24" height="4" rx="2" fill="#fff" opacity=".55"/></svg>
+            <svg width="60" height="24" viewBox="0 0 60 24"><path d="M12 4a8 8 0 1 0 0 16 6 6 0 0 1 0-16z" fill="none" stroke="#fff" stroke-width="1.6"/><rect x="26" y="9" width="28" height="4" rx="2" fill="#fff" opacity=".7"/></svg>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ 右侧表单区 ============ -->
+    <main class="form-side">
+      <div class="card">
+        <div class="card-head">
+          <h2>欢迎回来</h2>
+          <p>登录 BOSS智库知识库，继续你的智能问答。</p>
+        </div>
+
+        <!-- 服务器错误 / 成功提示(role=alert 保证读屏播报) -->
+        <div class="notice" id="notice" role="alert" aria-live="polite"></div>
+
+        <form id="loginForm" novalidate>
+          <!-- 账号 -->
+          <div class="field" id="f-username">
+            <div class="box">
+              <input type="text" id="username" name="username" placeholder=" "
+                     autocomplete="username" autocapitalize="none" spellcheck="false"
+                     aria-describedby="err-username" required>
+              <label for="username">用户名</label>
+              <svg class="tick" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" fill="rgba(14,212,126,.14)"/>
+                <path d="m7 12 3.2 3.4L17 8.5" stroke="#0ED47E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="err-msg" id="err-username"></span>
+          </div>
+
+          <!-- 密码 -->
+          <div class="field has-pw" id="f-password">
+            <div class="box">
+              <input type="password" id="password" name="password" placeholder=" "
+                     autocomplete="current-password" aria-describedby="err-password" required>
+              <label for="password">密码</label>
+              <svg class="tick" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" fill="rgba(14,212,126,.14)"/>
+                <path d="m7 12 3.2 3.4L17 8.5" stroke="#0ED47E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <button type="button" class="pw-toggle" id="pwToggle" aria-label="显示密码" aria-pressed="false">
+                <svg id="eyeOpen" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" stroke="currentColor" stroke-width="1.7"/>
+                  <circle cx="12" cy="12" r="2.8" stroke="currentColor" stroke-width="1.7"/>
+                </svg>
+                <svg id="eyeClosed" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none">
+                  <path d="M4 4l16 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  <path d="M9.6 6.1A9.8 9.8 0 0 1 12 5.5c6.4 0 10 6.5 10 6.5a17 17 0 0 1-3 3.6M6.4 8.3A17 17 0 0 0 2 12s3.6 6.5 10 6.5a9.6 9.6 0 0 0 3.2-.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <span class="err-msg" id="err-password"></span>
+          </div>
+
+          <!-- 记住我 / 忘记密码 -->
+          <div class="row-between">
+            <label class="remember">
+              <input type="checkbox" id="remember" name="remember">
+              <span class="cbox" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="m5 12 4.5 4.5L19 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              记住我
+            </label>
+            <button type="button" class="link-btn" id="forgotBtn" aria-expanded="false" aria-controls="notePop">忘记密码？</button>
+          </div>
+
+          <!-- 主 CTA -->
+          <button type="submit" class="cta" id="submitBtn">
+            <span class="cta-label">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h13M12 6l6 6-6 6" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              登录
+            </span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+
+        <div class="divider">或使用企业单点登录</div>
+
+        <!-- 第三方登录: 未接入 SSO, 全部禁用(不做能点的假按钮) -->
+        <div class="oauth" role="group" aria-label="第三方登录（暂未接入）">
+          <button type="button" disabled aria-disabled="true" title="未接入单点登录，请使用账号密码登录" aria-label="使用企业微信登录（暂未接入）">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 4.2c-3.6 0-6.5 2.4-6.5 5.4 0 1.7 1 3.2 2.5 4.2L4.3 16l2.3-1.2c.7.2 1.5.3 2.4.3" stroke="#0A2540" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M14.6 9.2c3 0 5.4 2 5.4 4.5s-2.4 4.5-5.4 4.5c-.7 0-1.4-.1-2-.3L10.9 19l.5-1.9C10.2 16.2 9.2 15 9.2 13.7" stroke="#0A2540" stroke-width="1.5" stroke-linejoin="round"/>
+              <circle cx="7" cy="8" r=".9" fill="#0A2540"/><circle cx="11" cy="8" r=".9" fill="#0A2540"/>
+            </svg>
+          </button>
+          <button type="button" disabled aria-disabled="true" title="未接入单点登录，请使用账号密码登录" aria-label="使用钉钉登录（暂未接入）">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3c-4.2 0-7.5 3.1-7.5 7s3.3 7 7.5 7c.9 0 1.7-.1 2.5-.4l3 1.6-.7-2.7c1.6-1.2 2.7-3 2.7-5.1 0-3.9-3.3-7-7.5-7z" stroke="#0A2540" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M14.6 10.7 8.5 13l2.6-.9-1.9.2 5-2.4-1.5.6z" fill="#0A2540"/>
+            </svg>
+          </button>
+          <button type="button" disabled aria-disabled="true" title="未接入单点登录，请使用账号密码登录" aria-label="使用飞书登录（暂未接入）">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 15c3-6 8.5-9 15-8.2-.6 1.6-1.8 2.8-3.4 3.5 1 .1 1.9.5 2.6 1.2-2.4 4-7 6.2-11.6 5.8" stroke="#0A2540" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M8.6 15.4c1.8-2 4.3-3.3 7-3.6" stroke="#0A2540" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" disabled aria-disabled="true" title="未接入单点登录，请使用账号密码登录" aria-label="使用 GitHub 登录（暂未接入）">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2.6c-5 0-9 4.1-9 9.2 0 4.1 2.6 7.5 6.2 8.7.4.1.6-.2.6-.5v-1.7c-2.6.6-3.1-1.1-3.1-1.1-.5-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.7.3-1.1.6-1.4-2.1-.2-4.2-1.1-4.2-4.7 0-1 .4-1.9 1-2.5-.1-.3-.4-1.2.1-2.5 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.2.1 2.5.6.6 1 1.5 1 2.5 0 3.6-2.1 4.5-4.2 4.7.3.3.6.8.6 1.7v2.6c0 .3.2.6.7.5A9.2 9.2 0 0 0 21 11.8c0-5.1-4-9.2-9-9.2z" stroke="#0A2540" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <p class="oauth-note">企业微信 / 钉钉 / 飞书 / GitHub 单点登录尚未接入，请使用账号密码登录。</p>
+
+        <div class="aux">没有账号？<button type="button" class="link-btn" id="adminBtn" aria-expanded="false" aria-controls="notePop">联系管理员</button></div>
+
+        <!-- 诚实说明浮层(忘记密码 / 联系管理员 共用) -->
+        <div class="note-pop" id="notePop" role="status" aria-live="polite" hidden>
+          <button type="button" class="close" id="noteClose" aria-label="关闭提示">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+          <strong id="noteTitle">忘记密码</strong>
+          <span id="noteBody"></span>
+        </div>
+      </div>
+
+      <!-- 信任徽章行 -->
+      <div class="trust">
+        <span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10" stroke="currentColor" stroke-width="1.7"/></svg>
+          数据传输加密
+        </span>
+        <span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          SOC2
+        </span>
+        <span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="9" width="16" height="9" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 9V6.5A4 4 0 0 1 16 6.5V9" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="13.5" r="1.4" fill="currentColor"/></svg>
+          私有化部署
+        </span>
+      </div>
+
+      <div class="copyright">© 2026 BOSS智库 · 企业级智能知识库系统</div>
+    </main>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =====================================================================
+     纯逻辑区(不碰 DOM)——安全/契约核心, 便于用桩单测
+     ===================================================================== */
+
+  // 开放重定向白名单: 只接受以单个 "/" 开头的站内路径。
+  // 拒绝: 绝对 URL(http(s)://, //host), 反斜杠绕过(/\host), 空值 -> 一律回落 "/"。
+  function safeNext(raw){
+    if (typeof raw !== "string" || raw.length === 0) return "/";
+    // 必须以 "/" 开头, 且第二个字符不能是 "/" 或 "\" (防 //evil 与 /\evil)
+    if (!/^\/(?![/\\])/.test(raw)) return "/";
+    // 任何位置出现反斜杠或连续斜杠都视为可疑, 回落首页
+    if (raw.indexOf("\\") !== -1) return "/";
+    if (raw.indexOf("//") !== -1) return "/";
+    // 拒绝内嵌协议 (如 /redirect?to=javascript:, 保守起见不含 : 之外再放行)
+    if (raw.indexOf(":") !== -1) return "/";
+    return raw;
+  }
+
+  // 解析 POST /login 响应: 非 2xx 也读 error 文案。
+  // status: number, body: 已解析 JSON 或 null, retryAfter: 头字符串或 null, next: 原始 ?next= 值
+  function interpretLoginResponse(status, body, retryAfter, next){
+    if (status >= 200 && status < 300 && body && body.ok === true){
+      return { action: "redirect",
+               target: safeNext(next),
+               display_name: body.display_name || body.username || "" };
+    }
+    // 关键: 服务器不区分用户不存在/密码错, 前端也不试图区分。
+    var msg = (body && typeof body.error === "string" && body.error.length)
+              ? body.error : null;
+    if (!msg){
+      if (status === 429)      msg = "尝试次数过多，请稍后再试";
+      else if (status === 503) msg = "认证服务暂不可用（数据库未就绪）";
+      else if (status === 401 || status === 403) msg = "用户名或密码错误";
+      else                     msg = "登录失败（状态 " + status + "），请稍后重试";
+    }
+    if (status === 429 && retryAfter != null){
+      var s = parseInt(retryAfter, 10);
+      if (!isNaN(s) && s > 0) msg += "（约 " + s + " 秒后可重试）";
+    }
+    return { action: "error", message: msg, status: status };
+  }
+
+  // 解析 GET /api/me 响应: 200 视为已登录 -> 直接跳转; 其余(401/404/网络错)留在登录页。
+  function interpretMeResponse(status, body, next){
+    if (status >= 200 && status < 300 && body &&
+        (body.username || body.display_name)){
+      return { action: "redirect", target: safeNext(next) };
+    }
+    return { action: "stay" };
+  }
+
+  // 前端体验校验(不当作安全): 用户名非空, 密码 >=6 位。返回 { ok, bad: 'username'|'password'|null }
+  function clientValidate(username, password){
+    var u = (username || "").trim();
+    if (!u) return { ok:false, bad:"username", reason:"empty" };
+    if (!password || password.length < 6) return { ok:false, bad:"password", reason:"short" };
+    return { ok:true, bad:null, reason:"" };
+  }
+
+  var KB = { safeNext: safeNext, interpretLoginResponse: interpretLoginResponse,
+             interpretMeResponse: interpretMeResponse, clientValidate: clientValidate };
+  try { if (typeof window !== "undefined") window.KBLogin = KB; } catch(e){}
+  try { if (typeof module !== "undefined" && module.exports) module.exports = KB; } catch(e){}
+
+  /* 无 DOM 环境(桩测试)时到此为止 */
+  if (typeof document === "undefined" || !document.getElementById) return;
+
+  /* =====================================================================
+     DOM 交互区
+     ===================================================================== */
+  document.addEventListener("DOMContentLoaded", init);
+
+  function init(){
+    var form       = document.getElementById("loginForm");
+    if (!form) return;
+
+    var username   = document.getElementById("username");
+    var password   = document.getElementById("password");
+    var fUsername  = document.getElementById("f-username");
+    var fPassword  = document.getElementById("f-password");
+    var errUsername= document.getElementById("err-username");
+    var errPassword= document.getElementById("err-password");
+    var notice     = document.getElementById("notice");
+    var submitBtn  = document.getElementById("submitBtn");
+    var pwToggle   = document.getElementById("pwToggle");
+    var eyeOpen    = document.getElementById("eyeOpen");
+    var eyeClosed  = document.getElementById("eyeClosed");
+    var remember   = document.getElementById("remember");
+    var forgotBtn  = document.getElementById("forgotBtn");
+    var adminBtn   = document.getElementById("adminBtn");
+    var card       = form.closest ? form.closest(".card") : document.querySelector(".card");
+    var notePop    = document.getElementById("notePop");
+    var noteTitle  = document.getElementById("noteTitle");
+    var noteBody   = document.getElementById("noteBody");
+    var noteClose  = document.getElementById("noteClose");
+
+    var submitting = false;
+
+    function nextParam(){
+      try { return new URLSearchParams(window.location.search).get("next"); }
+      catch(e){ return null; }
+    }
+
+    /* ---- 提示条 ---- */
+    function showNotice(kind, text){
+      notice.className = "notice show " + (kind === "ok" ? "is-ok" : "is-error");
+      notice.textContent = text;
+    }
+    function hideNotice(){ notice.className = "notice"; notice.textContent = ""; }
+
+    /* ---- 字段错误 ---- */
+    function fieldError(field, msgEl, msg){
+      field.classList.remove("valid");
+      field.classList.add("error");
+      msgEl.textContent = msg;
+    }
+    function fieldValid(field, msgEl){
+      field.classList.remove("error");
+      field.classList.add("valid");
+      msgEl.textContent = "";
+    }
+    function fieldClear(field, msgEl){
+      field.classList.remove("error");
+      field.classList.remove("valid");
+      msgEl.textContent = "";
+    }
+
+    /* ---- 实时体验校验 ---- */
+    username.addEventListener("input", function(){
+      if (username.value.trim()) fieldValid(fUsername, errUsername);
+      else fieldClear(fUsername, errUsername);
+    });
+    password.addEventListener("input", function(){
+      if (password.value.length >= 6) fieldValid(fPassword, errPassword);
+      else fieldClear(fPassword, errPassword);
+    });
+    username.addEventListener("blur", function(){
+      if (!username.value.trim()) fieldError(fUsername, errUsername, "请输入用户名");
+    });
+    password.addEventListener("blur", function(){
+      if (!password.value) fieldError(fPassword, errPassword, "请输入密码");
+      else if (password.value.length < 6) fieldError(fPassword, errPassword, "密码至少 6 位");
+    });
+
+    /* ---- 密码显隐 ---- */
+    pwToggle.addEventListener("click", function(){
+      var show = password.type === "password";
+      password.type = show ? "text" : "password";
+      eyeOpen.style.display   = show ? "none"  : "block";
+      eyeClosed.style.display = show ? "block" : "none";
+      pwToggle.setAttribute("aria-label", show ? "隐藏密码" : "显示密码");
+      pwToggle.setAttribute("aria-pressed", String(show));
+      password.focus();
+    });
+
+    /* ---- 加载即探测已登录 (GET /api/me) ---- */
+    (function checkSession(){
+      try {
+        var p = fetch("/api/me", { method:"GET", credentials:"same-origin",
+                                   headers:{ "Accept":"application/json" } });
+        if (p && p.then){
+          p.then(function(res){
+            return res.json().catch(function(){ return null; }).then(function(body){
+              if (res.status >= 200 && res.status < 300){
+                var d = interpretMeResponse(res.status, body, nextParam());
+                if (d.action === "redirect") window.location.replace(d.target);
+              }
+            });
+          }).catch(function(){ /* 后端未就绪/静态预览: 静默停留 */ });
+        }
+      } catch(e){ /* fetch 不可用: 忽略 */ }
+    })();
+
+    /* ---- 提交 (POST /login, application/json) ---- */
+    function setLoading(on){
+      submitting = on;
+      submitBtn.classList.toggle("loading", on);
+      submitBtn.disabled = on;
+      submitBtn.setAttribute("aria-busy", String(on));
+    }
+
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
+      if (submitting) return;
+      hideNotice();
+
+      var v = clientValidate(username.value, password.value);
+      if (!v.ok){
+        if (v.bad === "username"){ fieldError(fUsername, errUsername, "请输入用户名"); username.focus(); }
+        else { fieldError(fPassword, errPassword, v.reason === "empty" ? "请输入密码" : "密码至少 6 位"); password.focus(); }
+        return;
+      }
+      fieldValid(fUsername, errUsername);
+      fieldValid(fPassword, errPassword);
+
+      setLoading(true);
+      var payload = JSON.stringify({
+        username: username.value.trim(),
+        password: password.value,
+        remember: !!remember.checked
+      });
+
+      fetch("/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type":"application/json", "Accept":"application/json" },
+        body: payload
+      }).then(function(res){
+        // 非 2xx 也要取 JSON 里的 error 文案
+        return res.json().catch(function(){ return null; }).then(function(body){
+          var retry = null;
+          try { retry = res.headers.get("Retry-After"); } catch(e){}
+          var d = interpretLoginResponse(res.status, body, retry, nextParam());
+          if (d.action === "redirect"){
+            var who = d.display_name ? (d.display_name + "，") : "";
+            showNotice("ok", "登录成功，" + who + "正在进入工作台…");
+            // 保持 spinner, 稍作停顿让绿色成功态可见后再跳转
+            window.setTimeout(function(){ window.location.replace(d.target); }, 450);
+          } else {
+            setLoading(false);
+            showNotice("error", d.message);
+            password.select();
+            password.focus();
+          }
+        });
+      }).catch(function(){
+        setLoading(false);
+        showNotice("error", "无法连接服务器，请确认后端已就绪后重试");
+      });
+    });
+
+    /* ---- 诚实说明浮层(忘记密码 / 联系管理员) ---- */
+    var noteTimer = null;
+    var currentAnchor = null;
+
+    function positionNote(anchor){
+      if (!card) return;
+      var cRect = card.getBoundingClientRect();
+      var aRect = anchor.getBoundingClientRect();
+      notePop.style.visibility = "hidden";
+      notePop.style.left = "0px"; notePop.style.top = "0px";
+      var pRect = notePop.getBoundingClientRect();
+      var relTop = aRect.bottom - cRect.top + 10;
+      var desiredLeft = (aRect.left - cRect.left) + aRect.width/2 - pRect.width/2;
+      var maxLeft = cRect.width - pRect.width - 12;
+      var left = Math.max(12, Math.min(desiredLeft, maxLeft < 12 ? 12 : maxLeft));
+      notePop.style.left = left + "px";
+      notePop.style.top  = relTop + "px";
+      notePop.style.visibility = "visible";
+    }
+
+    function openNote(anchor, title, html){
+      if (noteTimer){ clearTimeout(noteTimer); noteTimer = null; }
+      noteTitle.textContent = title;
+      noteBody.innerHTML = html;          // 内容均为下方静态字面量, 无用户输入
+      notePop.hidden = false;
+      positionNote(anchor);
+      requestAnimationFrame(function(){ notePop.classList.add("show"); });
+      anchor.setAttribute("aria-expanded", "true");
+      currentAnchor = anchor;
+    }
+    function closeNote(){
+      if (!notePop) return;
+      notePop.classList.remove("show");
+      if (currentAnchor) currentAnchor.setAttribute("aria-expanded", "false");
+      if (noteTimer) clearTimeout(noteTimer);
+      noteTimer = window.setTimeout(function(){ notePop.hidden = true; noteTimer = null; }, 180);
+      currentAnchor = null;
+    }
+    function noteOpen(){ return notePop && !notePop.hidden && notePop.classList.contains("show"); }
+
+    var FORGOT_HTML = '本系统为<b>私有化部署</b>，请联系管理员在服务器上执行<br><code>scripts/seed_admin.py</code><br>重置密码。';
+    var ADMIN_HTML  = '本系统<b>不开放自助注册</b>，请联系管理员为你创建账号并分配知识库权限。';
+
+    forgotBtn.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      if (noteOpen() && currentAnchor === forgotBtn) closeNote();
+      else openNote(forgotBtn, "忘记密码", FORGOT_HTML);
+    });
+    adminBtn.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      if (noteOpen() && currentAnchor === adminBtn) closeNote();
+      else openNote(adminBtn, "开通账号", ADMIN_HTML);
+    });
+    noteClose.addEventListener("click", function(ev){ ev.stopPropagation(); var a=currentAnchor; closeNote(); if(a) a.focus(); });
+
+    document.addEventListener("click", function(ev){
+      if (noteOpen() && !notePop.contains(ev.target)) closeNote();
+    });
+    document.addEventListener("keydown", function(ev){
+      if (ev.key === "Escape" && noteOpen()){ var a = currentAnchor; closeNote(); if(a) a.focus(); }
+    });
+    window.addEventListener("resize", function(){ if (noteOpen() && currentAnchor) positionNote(currentAnchor); });
+    window.addEventListener("scroll", function(){ if (noteOpen() && currentAnchor) positionNote(currentAnchor); }, true);
+  }
+})();
+</script>
+</body>
+</html>

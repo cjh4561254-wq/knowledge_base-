@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<!--
+  方案编号：03 · 风格名：Microsoft Fluent Design
+  负责子智能体：Sub-Agent-MS-Acrylic（前端视图 · 登录页）
+  设计系统要点：
+    1) Acrylic 亚克力材质：登录卡片 rgba(255,255,255,.7) + backdrop-filter blur(20px) saturate(180%) + 同幅 SVG 噪声叠层(opacity .04)，全页仅此一层毛玻璃（无 GPU 约束）。
+    2) Reveal 微光交互：卡片与主按钮跟随光标的边框/内部高光（--mx/--my + radial-gradient），仅 hover 启用，rAF 节流，prefers-reduced-motion 关闭。
+    3) Fluent 秩序感：小圆角 4px/8px、8px 网格、字号阶梯 28/24/20/14/12、品牌蓝 #0078D4、TextField 底部下划线动画 + 按钮四态。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · BOSS智库知识库 · Fluent Design</title>
+<style>
+  /* ============ 共享 Fluent token（与主页面同源） ============ */
+  :root{
+    --brand:#0078D4;          /* 品牌蓝 */
+    --brand-hover:#106EBE;    /* hover 加深 */
+    --brand-active:#2B6FBF;   /* active */
+    --text:#201F1E;           /* 主文字 */
+    --text-2:#605E5C;         /* 次要文字 */
+    --surface:#FFFFFF;        /* 表面 */
+    --surface-2:#FAF9F8;      /* 次表面 */
+    --divider:#E1DFDD;        /* 分隔线 */
+    --err:#A4262C;            /* Fluent 错误红 */
+    --err-bg:#FDE7E9;         /* 错误提示底 */
+    --radius-s:4px;           /* Fluent 小圆角 */
+    --radius-m:8px;
+    --grid:8px;
+    --fs-28:28px; --fs-24:24px; --fs-20:20px; --fs-14:14px; --fs-12:12px;
+    --font:"Segoe UI", system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+    /* SVG feTurbulence 噪声（内联生成，零外链）——背景底图与亚克力叠层共用 */
+    --noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    --reveal-x:50%; --reveal-y:50%;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--font);
+    color:var(--text);
+    font-size:var(--fs-14);
+    line-height:1.5;
+    min-height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:calc(var(--grid)*4) calc(var(--grid)*3);
+    /* ---- Fluent 风格抽象底图：蓝紫渐变 + 几何光斑 + 噪声，全部内联 ---- */
+    background-color:#0b1e3a;
+    background-image:
+      var(--noise),
+      radial-gradient(1100px 700px at 12% 8%, rgba(0,120,212,.55), transparent 60%),
+      radial-gradient(900px 640px at 88% 22%, rgba(102,79,190,.5), transparent 58%),
+      radial-gradient(1200px 900px at 60% 120%, rgba(0,99,177,.6), transparent 60%),
+      conic-gradient(from 210deg at 78% 82%, rgba(93,52,153,.4), rgba(0,120,212,.28) 30%, transparent 62%),
+      linear-gradient(135deg,#12233f 0%,#1b2a52 45%,#241a44 100%);
+    background-blend-mode:soft-light, normal, normal, normal, normal, normal;
+    background-size:140px 140px, cover, cover, cover, cover, cover;
+  }
+
+  /* 底图之上的抽象斜切几何（纯 CSS，增强商务秩序感） */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      linear-gradient(115deg, transparent 62%, rgba(255,255,255,.05) 62.2% 68%, transparent 68.2%),
+      linear-gradient(115deg, transparent 74%, rgba(255,255,255,.04) 74.2% 79%, transparent 79.2%);
+  }
+
+  /* ============ 亚克力登录卡片（全页唯一毛玻璃层） ============ */
+  .card{
+    position:relative;
+    z-index:1;
+    width:min(880px,100%);
+    display:grid;
+    grid-template-columns:300px 1fr;
+    border-radius:var(--radius-m);
+    overflow:hidden;
+    /* Acrylic */
+    background:rgba(255,255,255,.7);
+    -webkit-backdrop-filter:blur(20px) saturate(180%);
+    backdrop-filter:blur(20px) saturate(180%);
+    border:1px solid rgba(255,255,255,.65);
+    box-shadow:0 16px 40px rgba(0,0,0,.32), 0 2px 8px rgba(0,0,0,.18);
+  }
+  /* 亚克力噪声叠层：与底图同一 SVG 噪声，opacity .04，仅作用卡片 */
+  .card::before{
+    content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background-image:var(--noise);
+    background-size:140px 140px;
+    opacity:.04;
+    mix-blend-mode:overlay;
+  }
+  /* Reveal 边框高光：仅 hover 时跟随光标显现 */
+  .card::after{
+    content:"";position:absolute;inset:0;z-index:5;pointer-events:none;
+    border-radius:inherit;
+    opacity:0;
+    transition:opacity .25s ease;
+    background:
+      radial-gradient(220px circle at var(--reveal-x) var(--reveal-y),
+        rgba(255,255,255,.55), rgba(255,255,255,0) 62%);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+            mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask-composite:exclude;
+    padding:1px; /* 高光仅出现在 1px 边框环带 */
+  }
+  .card:hover::after{opacity:1}
+
+  /* ============ 左侧品牌区 ============ */
+  .brand{
+    position:relative;z-index:1;
+    padding:calc(var(--grid)*5) calc(var(--grid)*4);
+    display:flex;flex-direction:column;gap:calc(var(--grid)*2);
+    background:linear-gradient(160deg, rgba(0,120,212,.10), rgba(102,79,190,.08));
+    border-right:1px solid rgba(32,31,30,.08);
+  }
+  .logo{
+    width:56px;height:56px;border-radius:var(--radius-m);
+    display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--brand),#5b4fb0);
+    box-shadow:0 6px 16px rgba(0,120,212,.35);
+  }
+  .logo svg{width:30px;height:30px;display:block}
+  .brand h1{font-size:var(--fs-24);font-weight:600;letter-spacing:.2px;color:var(--text)}
+  .brand .sub{font-size:var(--fs-14);color:var(--text-2);line-height:1.6}
+  .brand .tags{margin-top:auto;display:flex;flex-direction:column;gap:var(--grid)}
+  .brand .tag{
+    display:flex;align-items:center;gap:var(--grid);
+    font-size:var(--fs-12);color:var(--text-2);
+  }
+  .brand .tag i{width:6px;height:6px;border-radius:50%;background:var(--brand);flex:none}
+
+  /* ============ 右侧表单区 ============ */
+  .form-wrap{position:relative;z-index:1;padding:calc(var(--grid)*5) calc(var(--grid)*5)}
+  .form-title{font-size:var(--fs-20);font-weight:600;color:var(--text);margin-bottom:calc(var(--grid)*0.5)}
+  .form-desc{font-size:var(--fs-12);color:var(--text-2);margin-bottom:calc(var(--grid)*3)}
+
+  .field{margin-bottom:calc(var(--grid)*2.5)}
+  .field > label{
+    display:block;font-size:var(--fs-12);color:var(--text);
+    margin-bottom:var(--grid);font-weight:600;
+  }
+  /* Fluent TextField：底部 1px 描边，focus 时底部 2px 品牌蓝下划线动画 */
+  .text-field{position:relative}
+  .text-field .icon-left{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-2);display:grid;pointer-events:none}
+  .text-field input{
+    width:100%;
+    font-family:var(--font);
+    font-size:var(--fs-14);
+    color:var(--text);
+    background:rgba(255,255,255,.72);
+    border:1px solid var(--divider);
+    border-bottom:1px solid #8a8886; /* Fluent 底边略深 */
+    border-radius:var(--radius-s);
+    padding:10px 12px;
+    padding-left:38px;
+    outline:none;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .text-field .pw-toggle{
+    position:absolute;right:6px;top:50%;transform:translateY(-50%);
+    width:32px;height:32px;border:none;background:transparent;cursor:pointer;
+    border-radius:var(--radius-s);color:var(--text-2);display:grid;place-items:center;
+    transition:background .15s ease;
+  }
+  .text-field .pw-toggle:hover{background:rgba(0,0,0,.06)}
+  /* 底部下划线（focus 动画：从中心 scaleX 展开） */
+  .text-field::after{
+    content:"";position:absolute;left:8px;right:8px;bottom:0;height:2px;
+    background:var(--brand);border-radius:2px;
+    transform:scaleX(0);transform-origin:center;
+    transition:transform .2s cubic-bezier(.1,.9,.2,1);
+  }
+  .text-field:focus-within::after{transform:scaleX(1)}
+  .text-field input:focus{background:#fff;border-color:var(--brand)}
+
+  /* 错误态：Fluent 输入框错误描边 + 红字 ErrorMessage */
+  .field.is-error .text-field input{border-color:var(--err);border-bottom-color:var(--err);background:var(--err-bg)}
+  .field.is-error .text-field::after{background:var(--err);transform:scaleX(1)}
+  .error-msg{
+    display:none;align-items:center;gap:6px;
+    margin-top:6px;font-size:var(--fs-12);color:var(--err);
+  }
+  .field.is-error .error-msg{display:flex}
+  .error-msg svg{flex:none}
+
+  /* 记住我 / 忘记密码 行 */
+  .row-between{display:flex;align-items:center;justify-content:space-between;margin:calc(var(--grid)*2) 0 calc(var(--grid)*3)}
+  .remember{display:inline-flex;align-items:center;gap:var(--grid);cursor:pointer;font-size:var(--fs-14);color:var(--text);user-select:none}
+  .remember input{
+    appearance:none;-webkit-appearance:none;width:18px;height:18px;flex:none;cursor:pointer;
+    border:1px solid #8a8886;border-radius:var(--radius-s);background:rgba(255,255,255,.7);
+    display:grid;place-items:center;transition:background .15s ease,border-color .15s ease;
+  }
+  .remember input:checked{background:var(--brand);border-color:var(--brand)}
+  .remember input:checked::after{content:"";width:10px;height:6px;border:2px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translateY(-1px)}
+  .remember input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .link{color:var(--brand);font-size:var(--fs-14);text-decoration:none}
+  .link:hover{color:var(--brand-hover);text-decoration:underline}
+
+  /* Fluent Button：主 CTA + Reveal 微光 */
+  .btn-primary{
+    position:relative;
+    width:100%;
+    font-family:var(--font);font-size:var(--fs-14);font-weight:600;
+    color:#fff;background:var(--brand);
+    border:none;border-radius:var(--radius-s);
+    padding:11px 16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:var(--grid);
+    transition:background .15s ease, transform .06s ease;
+    overflow:hidden;
+  }
+  .btn-primary:hover{background:var(--brand-hover)}
+  .btn-primary:active{background:var(--brand-active);transform:scale(.995)}
+  .btn-primary[disabled]{background:#b8d6ee;color:#f3f9fd;cursor:not-allowed}
+  /* 按钮 Reveal 内部微光（仅 hover） */
+  .btn-primary::after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s ease;
+    background:radial-gradient(120px circle at var(--reveal-x) var(--reveal-y), rgba(255,255,255,.35), transparent 60%);
+  }
+  .btn-primary:not([disabled]):hover::after{opacity:1}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn-primary.loading .spinner{display:inline-block}
+  .btn-primary.loading .btn-label{opacity:.85}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Sign-in options（Windows Hello 式小圆图标行） */
+  .hello-row{display:flex;align-items:center;gap:calc(var(--grid)*2);margin-top:calc(var(--grid)*3)}
+  .hello-row .cap{font-size:var(--fs-12);color:var(--text-2)}
+  .hello{
+    width:40px;height:40px;border-radius:50%;cursor:pointer;
+    border:1px solid var(--divider);background:rgba(255,255,255,.7);
+    display:grid;place-items:center;color:var(--text-2);
+    transition:border-color .15s ease, background .15s ease, color .15s ease;
+  }
+  .hello:hover{border-color:var(--brand);color:var(--brand);background:#fff}
+
+  /* 分隔线 */
+  .divider{display:flex;align-items:center;gap:calc(var(--grid)*1.5);margin:calc(var(--grid)*3.5) 0 calc(var(--grid)*2.5)}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--divider)}
+  .divider span{font-size:var(--fs-12);color:var(--text-2)}
+
+  /* 第三方登录 */
+  .sso{display:flex;justify-content:center;gap:calc(var(--grid)*1.5)}
+  .sso button{
+    width:52px;height:44px;cursor:pointer;
+    border:1px solid var(--divider);border-radius:var(--radius-s);
+    background:rgba(255,255,255,.7);display:grid;place-items:center;color:var(--text);
+    transition:border-color .15s ease, background .15s ease, transform .1s ease;
+  }
+  .sso button:hover{border-color:var(--brand);background:#fff}
+  .sso button:active{transform:translateY(1px)}
+  .sso button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .sso svg{width:22px;height:22px;display:block}
+
+  .copyright{margin-top:calc(var(--grid)*4);text-align:center;font-size:var(--fs-12);color:var(--text-2)}
+
+  /* 无障碍：统一 focus 环 */
+  :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+  /* ============ 响应式：1440 / 1024 / 768 / 390 ============ */
+  @media (max-width:900px){
+    .card{grid-template-columns:1fr}
+    .brand{border-right:none;border-bottom:1px solid rgba(32,31,30,.08);flex-direction:row;align-items:center;gap:calc(var(--grid)*2);padding:calc(var(--grid)*3) calc(var(--grid)*4)}
+    .brand .tags{display:none}
+    .brand h1{font-size:var(--fs-20)}
+    .brand .sub{font-size:var(--fs-12)}
+  }
+  @media (max-width:768px){
+    body{padding:calc(var(--grid)*2)}
+    .card{width:100%}
+    .form-wrap{padding:calc(var(--grid)*4) calc(var(--grid)*3)}
+    /* 中档降级 Reveal：关掉边框环带高光以省性能 */
+    .card::after{display:none}
+  }
+  @media (max-width:390px){
+    .card{border-radius:var(--radius-s)}
+    .brand{flex-direction:column;align-items:flex-start;gap:var(--grid)}
+    .form-wrap{padding:calc(var(--grid)*3.5) calc(var(--grid)*2.5)}
+    .row-between{flex-direction:column;align-items:flex-start;gap:calc(var(--grid)*1.5)}
+    .hello-row{flex-wrap:wrap}
+    .sso button{width:100%;max-width:56px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms !important;transition-duration:.001ms !important}
+    .card::after,.btn-primary::after{display:none !important} /* Reveal 关闭 */
+    .spinner{animation:none;border-top-color:transparent}
+  }
+</style>
+</head>
+<body>
+  <!-- 内联噪声滤镜（供 SVG 图形需要时引用；背景与亚克力用 data-URI 版本，二者同源） -->
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <filter id="fluentNoise"><feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="3" stitchTiles="stitch"/></filter>
+  </svg>
+
+  <main class="card" id="loginCard" role="main">
+    <!-- ============ 品牌区 ============ -->
+    <section class="brand">
+      <div class="logo" aria-hidden="true">
+        <!-- BOSS 智库：抽象翻开的书 + 光点（内联 SVG） -->
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v14.5H5.5A1.5 1.5 0 0 0 4 20V5.5Z" fill="#fff" opacity=".92"/>
+          <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v14.5h5.5A1.5 1.5 0 0 1 20 20V5.5Z" fill="#fff" opacity=".7"/>
+          <circle cx="12" cy="3" r="1.6" fill="#fff"/>
+        </svg>
+      </div>
+      <div>
+        <h1>BOSS智库知识库</h1>
+        <p class="sub">企业级智能知识库系统<br>安全登录，检索与导入一站式 workspace。</p>
+      </div>
+      <div class="tags" aria-hidden="true">
+        <span class="tag"><i></i>知识检索 Chat · 流式问答</span>
+        <span class="tag"><i></i>文档导入 · 向量化管线</span>
+        <span class="tag"><i></i>企业级权限与审计</span>
+      </div>
+    </section>
+
+    <!-- ============ 表单区 ============ -->
+    <section class="form-wrap">
+      <h2 class="form-title">登录</h2>
+      <p class="form-desc">使用工作账号访问知识库。</p>
+
+      <form id="loginForm" novalidate autocomplete="on">
+        <!-- 账号 -->
+        <div class="field" id="fieldAccount">
+          <label for="account">账号</label>
+          <div class="text-field">
+            <span class="icon-left" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg>
+            </span>
+            <input id="account" name="account" type="text" inputmode="text"
+                   placeholder="手机号 / 邮箱 / 用户名"
+                   autocomplete="username" autofocus aria-describedby="errAccount">
+          </div>
+          <p class="error-msg" id="errAccount" role="alert">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 6 6.5 11h-13L12 8Zm-1 3v3h2v-3h-2Zm0 4v2h2v-2h-2Z"/></svg>
+            <span>请输入账号</span>
+          </p>
+        </div>
+
+        <!-- 密码（显隐切换） -->
+        <div class="field is-error" id="fieldPw">
+          <label for="password">密码</label>
+          <div class="text-field">
+            <span class="icon-left" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="10.5" width="14" height="9" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>
+            </span>
+            <input id="password" name="password" type="password"
+                   placeholder="请输入密码"
+                   autocomplete="current-password" aria-describedby="errPw">
+            <button type="button" class="pw-toggle" id="pwToggle" aria-label="显示密码" aria-pressed="false">
+              <svg id="eyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="error-msg" id="errPw" role="alert">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 6 6.5 11h-13L12 8Zm-1 3v3h2v-3h-2Zm0 4v2h2v-2h-2Z"/></svg>
+            <span>用户名或密码错误</span>
+          </p>
+        </div>
+
+        <!-- 记住我 / 忘记密码 -->
+        <div class="row-between">
+          <label class="remember">
+            <input type="checkbox" id="remember" name="remember">
+            <span>记住我</span>
+          </label>
+          <a class="link" href="#" id="forgot">忘记密码？</a>
+        </div>
+
+        <!-- 主 CTA -->
+        <button type="submit" class="btn-primary" id="submitBtn">
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-label">登录</span>
+        </button>
+
+        <!-- Sign-in options（Windows Hello 式小圆图标行） -->
+        <div class="hello-row">
+          <span class="cap">登录选项</span>
+          <button type="button" class="hello" aria-label="使用 PIN 登录">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>
+          </button>
+          <button type="button" class="hello" aria-label="使用 Windows Hello 面部识别登录">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="11" r="2.2"/><path d="M8.5 16a3.5 3.5 0 0 1 7 0"/></svg>
+          </button>
+          <button type="button" class="hello" aria-label="使用 FIDO2 安全密钥登录">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="12" r="3.2"/><path d="M11.2 12H20M17 12v3M20 12v2"/></svg>
+          </button>
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="divider"><span>或使用以下方式登录</span></div>
+
+        <!-- 第三方登录：企业微信 / 钉钉 / 飞书 / GitHub -->
+        <div class="sso">
+          <button type="button" aria-label="使用企业微信登录" title="企业微信">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M9 4.5c-3.6 0-6.5 2.4-6.5 5.4 0 1.7.9 3.2 2.4 4.2L4 16.6l2.4-1.2c.8.2 1.7.4 2.6.4h.6" fill="#0082EF"/>
+              <path d="M15 8.4c3.1 0 5.6 2.1 5.6 4.7s-2.5 4.7-5.6 4.7c-.7 0-1.4-.1-2-.3L11 18.5l.7-1.6c-1-.8-1.6-2-1.6-3.3 0-2.6 2.5-4.7 5.6-4.7Z" fill="#2DC100"/>
+              <circle cx="7.2" cy="9" r=".9" fill="#fff"/><circle cx="10.8" cy="9" r=".9" fill="#fff"/>
+            </svg>
+          </button>
+          <button type="button" aria-label="使用钉钉登录" title="钉钉">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 3C7 3 4 6 4 10c0 3 1.4 5 3.5 6.2L8 20l3-1.6c.6.1 1.2.2 1.9.2 4.6 0 7.1-2.8 7.1-6.6C20 6 16.6 3 12 3Z" fill="#1E8FF5"/>
+              <path d="M8.6 11.8c1.8.4 4.2.3 6.2-.6M9 14.3c1.5.3 3.3.2 4.9-.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
+              <path d="M17 9.5c.9.3 1.6 1 2 1.9" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" aria-label="使用飞书登录" title="飞书">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4.5 8.2c3.8.2 7.6-.4 11-2 .6-.3 1.3.3 1.1 1-.6 2.4-2.3 4.6-4.6 5.9 1.4.6 2.6 1.6 3.4 3 .4.6-.2 1.3-.9 1.1-3.2-1-6-3.3-7.6-6.3-1.1.6-2 1.5-2.6 2.6-.3.6-1.2.4-1.3-.3-.3-1.9.2-3.9 1.5-5.4Z" fill="#3370FF"/>
+              <path d="M4.5 8.2c.9-.2 1.9-.2 2.8 0" stroke="#0050E6" stroke-width="1.1" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" aria-label="使用 GitHub 登录" title="GitHub">
+            <svg viewBox="0 0 24 24">
+              <path fill="#24292F" d="M12 2C6.5 2 3 5.7 3 10.4c0 2.1 1 4.9 3.2 6.4.3.2.6.1.7-.3l.3-1c.1-.3 0-.5-.3-.8-.7-.7-1.1-1.7-1.1-2.7 0-2.8 2-4.5 4.6-4.5.6 0 1.2.1 1.7.3l.2-1.4s-.1 0-.4-.1c-2.6 0-4.7 2.2-4.7 5.1 0 1.3.5 2.4 1.3 3.2-.3-.1-.6-.9-.7-1.2 0-.1-.2-.2-.4-.1-.7.1-.8.5-.4.9.2.1.4.6.4 1 .1.5.5.7 1.1.7-.4.3-.9.4-1.4.3-1 0-1.7-.7-1.7-1.7 0-.4.2-.8.4-1.1-.1-.4-.4-1.4 0-2.1 1.2 0 2 .9 2.3 1.2.4-.2.9-.3 1.4-.3.5 0 1 .1 1.4.3.3-.3 1-1.2 2.3-1.2.4.7.1 1.7 0 2.1.2.3.4.7.4 1.1 0 1-.7 1.7-1.7 1.7-.5.1-1 0-1.4-.3.6 0 1-.2 1.1-.7 0-.4.2-.9.4-1 .4-.4.3-.8-.4-.9-.2-.1-.4 0-.4.1-.1.3-.4 1.1-.7 1.2.8-.8 1.3-1.9 1.3-3.2 0-2.9-2.1-5.1-4.7-5.1-.3 0-.4.1-.4.1L10 8.5c.5-.2 1.1-.3 1.7-.3 2.6 0 4.6 1.7 4.6 4.5 0 1-.4 2-1.1 2.7-.3.3-.4.5-.3.8l.3 1c.1.4.4.5.7.3C18 15.3 19 12.5 19 10.4 19 5.7 17.5 2 12 2Z"/>
+            </svg>
+          </button>
+        </div>
+
+        <p class="copyright">© 2026 BOSS智库 · 企业级智能知识库系统</p>
+      </form>
+    </section>
+  </main>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var fine = (!window.matchMedia) || window.matchMedia("(hover:hover) and (pointer:fine)").matches;
+
+  /* ============ Reveal 微光：跟随光标，rAF 节流，仅 hover 启用 ============ */
+  function attachReveal(el){
+    if(!el || reduce || !fine) return;
+    if(window.innerWidth < 768) return; // 小屏/触屏降级
+    var raf = null, tx = 50, ty = 50;
+    function paint(){
+      raf = null;
+      el.style.setProperty("--reveal-x", tx + "%");
+      el.style.setProperty("--reveal-y", ty + "%");
+    }
+    el.addEventListener("pointermove", function(e){
+      var r = el.getBoundingClientRect();
+      tx = ((e.clientX - r.left) / r.width) * 100;
+      ty = ((e.clientY - r.top) / r.height) * 100;
+      if(raf === null) raf = requestAnimationFrame(paint);
+    });
+    el.addEventListener("pointerleave", function(){
+      if(raf !== null){ cancelAnimationFrame(raf); raf = null; }
+      tx = 50; ty = 50; paint();
+    });
+  }
+  attachReveal(document.getElementById("loginCard"));
+  attachReveal(document.getElementById("submitBtn"));
+
+  /* ============ 密码显隐切换 ============ */
+  var pw = document.getElementById("password");
+  var pwToggle = document.getElementById("pwToggle");
+  var eyeIcon = document.getElementById("eyeIcon");
+  var EYE = '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>';
+  var EYE_OFF = '<path d="M4 4l16 16"/><path d="M9.5 5.9A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.9 15.9 0 0 1-3.3 4M6.2 7.9A16 16 0 0 0 2.5 12S6 18.5 12 18.5c1 0 1.9-.1 2.8-.4"/><path d="M9.8 10a3 3 0 0 0 4.2 4.2"/>';
+  pwToggle.addEventListener("click", function(){
+    var show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    pwToggle.setAttribute("aria-pressed", String(show));
+    pwToggle.setAttribute("aria-label", show ? "隐藏密码" : "显示密码");
+    eyeIcon.innerHTML = show ? EYE_OFF : EYE;
+    pw.focus();
+  });
+
+  /* ============ 校验 + 错误态 ============ */
+  var form = document.getElementById("loginForm");
+  var account = document.getElementById("account");
+  var fieldAccount = document.getElementById("fieldAccount");
+  var fieldPw = document.getElementById("fieldPw");
+  var btn = document.getElementById("submitBtn");
+  var btnLabel = btn.querySelector(".btn-label");
+
+  function setError(field, on, msg){
+    field.classList.toggle("is-error", on);
+    if(msg){ var s = field.querySelector(".error-msg span"); if(s) s.textContent = msg; }
+    var inp = field.querySelector("input[type=text],input[type=password]");
+    if(inp) inp.setAttribute("aria-invalid", on ? "true" : "false");
+  }
+  // 输入时清除对应字段的错误态（错误描边随焦点恢复）
+  [ [account, fieldAccount], [pw, fieldPw] ].forEach(function(pair){
+    pair[0].addEventListener("input", function(){ setError(pair[1], false); });
+  });
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var ok = true;
+    if(!account.value.trim()){ setError(fieldAccount, true, "请输入账号"); ok = false; }
+    else setError(fieldAccount, false);
+    if(!pw.value){ setError(fieldPw, true, "请输入密码"); ok = false; }
+    else setError(fieldPw, true, "用户名或密码错误"); // 静态错误态：模拟后端拒绝
+
+    if(!ok){ (account.value.trim() ? pw : account).focus(); return; }
+
+    // 模拟提交 loading（禁止真实网络）
+    btn.classList.add("loading");
+    btn.disabled = true;
+    btnLabel.textContent = "正在登录…";
+    setTimeout(function(){
+      btn.classList.remove("loading");
+      btn.disabled = false;
+      btnLabel.textContent = "登录";
+      setError(fieldPw, true, "用户名或密码错误");
+      fieldPw.querySelector(".error-msg").scrollIntoView({block:"nearest"});
+    }, 1200);
+  });
+
+  /* ============ 记住我：持久化勾选（localStorage，仅演示，无网络） ============ */
+  var remember = document.getElementById("remember");
+  try{
+    if(localStorage.getItem("boss_remember") === "1"){
+      remember.checked = true;
+      if(account && !account.value) account.value = localStorage.getItem("boss_account") || "";
+    }
+  }catch(_){}
+  remember.addEventListener("change", function(){
+    try{
+      localStorage.setItem("boss_remember", remember.checked ? "1" : "0");
+      if(remember.checked) localStorage.setItem("boss_account", account.value);
+      else localStorage.removeItem("boss_account");
+    }catch(_){}
+  });
+  if(account) account.addEventListener("change", function(){
+    try{ if(remember.checked) localStorage.setItem("boss_account", account.value); }catch(_){}
+  });
+
+  /* ============ 忘记密码：占位反馈（无网络，不破版） ============ */
+  var forgot = document.getElementById("forgot");
+  forgot.addEventListener("click", function(e){
+    e.preventDefault();
+    setError(fieldPw, true, "请联系管理员重置密码，或稍后重试");
+    fieldPw.scrollIntoView({behavior: reduce ? "auto" : "smooth", block:"center"});
+  });
+
+  /* 第三方按钮：无网络，给出可聚焦反馈 */
+  document.querySelectorAll(".sso button, .hello").forEach(function(b){
+    b.addEventListener("click", function(){
+      btnLabel.textContent = "即将跳转 " + b.getAttribute("aria-label").replace(/^使用/,"").replace(/登录$/,"") + "…";
+      setTimeout(function(){ btnLabel.textContent = "登录"; }, 900);
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+.env
+.venv
+ADMIN_PASSWORD.txt
+scripts/**/__pycache__/
+
+# 运行期产物与本机 IDE 配置，不该进版本库
+__pycache__/
+*.pyc
+logs/
+temp-files/
+.idea/
+.reasonix/
+.mypy_cache/
+*.log
+
+# 内部工作板（排障记录/端口分配/遗留取舍），不对外发布
+AGENT_TASK_BOARD.md

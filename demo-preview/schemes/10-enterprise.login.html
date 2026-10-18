@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  方案编号：10
+  风格名：Amazon / 现代大厂高转化风（Sub-Agent-Enterprise-UX）· 登录页
+  负责子智能体：Sub-Agent-Enterprise-UX
+  设计系统要点：
+    1) 色彩：深蓝信任色 #0F4C81/#145A96（左侧背景/主链接）+ 中性灰阶 + 高转化橙黄 CTA #F59E0B/#FF9900（登录按钮/评分/强调数字）+ 辅助绿 #0E8A5F + 错误红 #C7372F。
+    2) 结构：高转化登录页 —— 左表单 + 右价值主张（3 条要点 + 1 指标看板 + 信任徽章条），底部 FAQ 两行折叠；4-8px 小圆角、1px 可见边框、克制阴影。
+    3) 表单控件极高清晰度：大号输入(44px)、label 在上、2px focus 边框、错误紧贴下方、必填星号、具体 placeholder；四家第三方内联 SVG + aria-label。
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · BOSS智库知识库｜方案10 大厂高转化风</title>
+<style>
+  :root{
+    --nav-900:#0F4C81; --nav-700:#145A96; --nav-800:#11548c;
+    --ink-900:#232A31; --ink-600:#5A6672; --line:#E5E9ED; --bg:#F7F9FA;
+    --amber:#F59E0B; --amber-600:#FF9900; --amber-700:#d97e06;
+    --green:#0E8A5F; --red:#C7372F;
+    --radius:6px; --radius-sm:4px; --radius-lg:8px;
+    --shadow:0 1px 2px rgba(15,76,129,.06),0 1px 3px rgba(35,42,49,.08);
+    --shadow-h:0 6px 20px rgba(15,76,129,.14),0 12px 32px rgba(35,42,49,.12);
+    --font:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink-900);font-family:var(--font);font-size:14px;line-height:1.5;height:100%}
+  a{color:var(--nav-700);text-decoration:none}
+  a:hover{text-decoration:underline}
+  button{font-family:var(--font);cursor:pointer}
+  svg{display:block}
+  :focus-visible{outline:3px solid #f59e0b88;outline-offset:2px;border-radius:2px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+  /* ===== shell ===== */
+  .shell{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr}
+
+  /* ===== LEFT: brand + form ===== */
+  .left{background:linear-gradient(150deg,#0F4C81 0%,#145A96 55%,#1a6aa8 100%);color:#fff;padding:30px 44px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .left::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:34px 34px;pointer-events:none}
+  .lbrand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:19px;position:relative;z-index:2}
+  .lbrand .logo{width:36px;height:36px;background:var(--amber);border-radius:var(--radius-sm);display:grid;place-items:center;color:var(--nav-900);font-weight:900;font-size:18px;flex:none}
+  .lsub{position:relative;z-index:2;margin:6px 0 0 47px;font-size:12.5px;color:#cfe0ef}
+  .lbody{flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2;max-width:400px;width:100%;margin:0 auto}
+  .lbody .hi{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a9cbe6;font-weight:700;margin-bottom:6px}
+  .lbody h1{font-size:26px;font-weight:800;line-height:1.25;margin-bottom:4px}
+  .lbody .lead{font-size:13px;color:#dbe8f3;margin-bottom:22px}
+
+  .card{background:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-h);padding:22px 22px 20px;color:var(--ink-900)}
+  .field{margin-bottom:15px}
+  .field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-900);margin-bottom:6px}
+  .req{color:var(--red);margin-left:2px}
+  .ipt{position:relative}
+  .ipt input{width:100%;height:44px;border:2px solid var(--line);border-radius:var(--radius);padding:0 14px;font-size:15px;color:var(--ink-900);background:#fff;transition:border-color .15s,box-shadow .15s}
+  .ipt input::placeholder{color:#9aa5b0}
+  .ipt input:focus{outline:none;border-color:var(--nav-700);box-shadow:0 0 0 3px rgba(20,90,150,.14)}
+  .ipt .eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:8px;color:var(--ink-600);border-radius:var(--radius-sm);display:flex}
+  .ipt .eye:hover{color:var(--nav-700);background:#f2f6fa}
+  .field.err .ipt input{border-color:var(--red);box-shadow:0 0 0 3px rgba(199,55,47,.12)}
+  .field.err label{color:var(--red)}
+  .tip{font-size:12px;color:var(--red);margin-top:6px;display:none;align-items:center;gap:6px;font-weight:600}
+  .field.err .tip{display:flex}
+  .tip svg{flex:none}
+
+  .row{display:flex;align-items:center;justify-content:space-between;margin:4px 0 16px;flex-wrap:wrap;gap:8px}
+  .remember{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-900);cursor:pointer;user-select:none}
+  .remember input{width:16px;height:16px;accent-color:var(--nav-700);cursor:pointer}
+  .forgot{font-size:13px;font-weight:600}
+
+  .login{width:100%;height:46px;background:var(--amber);color:var(--nav-900);border:none;border-radius:var(--radius);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px;transition:background .15s,transform .05s,opacity .15s;box-shadow:0 2px 0 var(--amber-700)}
+  .login:hover{background:var(--amber-600)}
+  .login:active{transform:translateY(2px);box-shadow:0 0 0 var(--amber-700)}
+  .login:focus-visible{outline:3px solid #0f4c81;outline-offset:2px}
+  .login[disabled]{opacity:.55;cursor:not-allowed;box-shadow:none;transform:none}
+  .login.loading{pointer-events:none}
+  .spinner{width:18px;height:18px;border:2.5px solid rgba(15,76,129,.3);border-top-color:var(--nav-900);border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .login.loading .spinner{display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .login.loading .txt{opacity:.8}
+  @media (prefers-reduced-motion:reduce){.spinner{animation-duration:1.4s}}
+
+  .divider{display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:var(--ink-600);font-size:12px}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+  .social{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .sbtn{height:44px;border:1px solid var(--line);border-radius:var(--radius);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:border-color .14s,background .14s;color:var(--ink-900)}
+  .sbtn:hover{border-color:var(--nav-700);background:#f5f9fc}
+  .sbtn span{font-size:10.5px;color:var(--ink-600);font-weight:600}
+  .sbtn svg{width:22px;height:22px}
+
+  .lfoot{position:relative;z-index:2;margin-top:20px;font-size:11.5px;color:#a9cbe6;text-align:center}
+  .lfoot a{color:#d5e6f4}
+
+  /* ===== RIGHT: value proposition ===== */
+  .right{background:#fff;padding:34px 44px;display:flex;flex-direction:column;justify-content:center;gap:26px;border-left:1px solid var(--line)}
+  .rmax{max-width:520px;width:100%;margin:0 auto}
+  .rhead{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-600);font-weight:700;margin-bottom:10px}
+  .rtitle{font-size:28px;font-weight:800;color:var(--nav-900);line-height:1.2;margin-bottom:20px}
+  .vals{display:flex;flex-direction:column;gap:16px}
+  .val{display:flex;gap:14px;align-items:flex-start}
+  .val .ic{width:40px;height:40px;border-radius:var(--radius);flex:none;display:grid;place-items:center;background:#eaf7f0;border:1px solid #bfe6d1}
+  .val:nth-child(2) .ic{background:#fff7e6;border-color:#fbd9a0}
+  .val:nth-child(3) .ic{background:#eaf1f8;border-color:#c6dbef}
+  .val .vt{font-weight:800;color:var(--ink-900);font-size:15px}
+  .val .vd{font-size:13px;color:var(--ink-600);margin-top:3px}
+
+  /* metrics board */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:4px}
+  .mc{border:1px solid var(--line);border-radius:var(--radius);padding:13px 12px;background:#fbfcfd;position:relative;overflow:hidden}
+  .mc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--nav-700)}
+  .mc.hot::before{background:var(--amber)}
+  .mc .mlbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-600);font-weight:700}
+  .mc .mval{font-size:27px;font-weight:800;color:var(--ink-900);margin-top:5px;font-variant-numeric:tabular-nums;line-height:1}
+  .mc .mval small{font-size:13px;color:var(--ink-600);font-weight:600}
+  .mc .mtrend{font-size:11px;font-weight:700;margin-top:4px}
+  .up{color:var(--green)}.down{color:var(--green)}.flat{color:var(--ink-600)}
+
+  /* trust badge strip */
+  .trust{border:1px solid var(--line);border-radius:var(--radius-lg);padding:15px 16px;background:#fbfcfd}
+  .trust .trow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .tb{display:flex;align-items:center;gap:8px;justify-content:center;font-size:12px;font-weight:700;color:var(--ink-900);padding:8px 6px;border:1px solid var(--line);border-radius:var(--radius-sm);background:#fff}
+  .tb svg{flex:none}
+
+  .rc{margin-top:6px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .rc .cta{background:var(--amber);color:var(--nav-900);border:none;padding:11px 22px;border-radius:var(--radius);font-size:14px;font-weight:800;transition:background .15s,transform .05s}
+  .rc .cta:hover{background:var(--amber-600)}.rc .cta:active{transform:translateY(1px)}
+  .rc .note{font-size:12px;color:var(--ink-600)}
+
+  /* FAQ */
+  .faq{margin-top:8px}
+  .faq .qh{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-600);font-weight:700;margin-bottom:10px}
+  .qa{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;background:#fff}
+  .qa > button{width:100%;text-align:left;background:none;border:none;padding:12px 14px;font-size:13.5px;font-weight:700;color:var(--ink-900);display:flex;align-items:center;gap:10px}
+  .qa > button:hover{color:var(--nav-700)}
+  .qa .caret{margin-left:auto;transition:transform .2s;color:var(--ink-600)}
+  .qa.open .caret{transform:rotate(90deg)}
+  .qa .ans{display:none;padding:0 14px 13px;font-size:12.5px;color:var(--ink-600);line-height:1.6}
+  .qa.open .ans{display:block}
+
+  /* toast */
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--nav-900);color:#fff;padding:11px 20px;border-radius:var(--radius);box-shadow:var(--shadow-h);font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width:1024px){
+    .shell{grid-template-columns:1fr}
+    .right{border-left:none;border-top:1px solid var(--line)}
+    .left{padding:26px 30px}
+    .right{padding:30px 30px 40px}
+    .metrics{grid-template-columns:repeat(2,1fr)}
+    .trust .trow{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width:768px){
+    .lbody .hi,h1{margin-top:6px}
+    .card{padding:20px 18px}
+  }
+  @media (max-width:390px){
+    .left{padding:22px 18px}
+    .right{padding:26px 18px 40px}
+    .lbrand{font-size:17px}
+    .lbody h1{font-size:22px}
+    .rtitle{font-size:23px}
+    .metrics{grid-template-columns:repeat(2,1fr);gap:10px}
+    .mc .mval{font-size:23px}
+    .social{grid-template-columns:repeat(2,1fr)}
+    .trust .trow{grid-template-columns:repeat(2,1fr)}
+    .row{gap:10px}
+    .catnav-hint{font-size:11px}
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ================= LEFT: login form ================= -->
+  <section class="left">
+    <div class="lbrand"><span class="logo" aria-hidden="true">B</span>BOSS智库知识库</div>
+    <p class="lsub">企业级智能知识库系统 · 私有化 RAG 检索增强</p>
+
+    <div class="lbody">
+      <div class="hi">欢迎回来</div>
+      <h1>登录你的知识库工作台</h1>
+      <p class="lead">登录后即可检索私有知识、联网融合问答并导入文档。</p>
+
+      <form class="card" id="loginForm" novalidate>
+        <div class="field" id="f-account">
+          <label for="account">账号<span class="req" aria-hidden="true">*</span></label>
+          <div class="ipt"><input type="text" id="account" name="account" placeholder="手机号 / 邮箱 / 用户名" autocomplete="username" aria-required="true"></div>
+          <div class="tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span class="tip-t">请输入账号</span></div>
+        </div>
+
+        <div class="field err" id="f-pwd">
+          <label for="pwd">密码<span class="req" aria-hidden="true">*</span></label>
+          <div class="ipt">
+            <input type="password" id="pwd" name="pwd" placeholder="请输入登录密码" autocomplete="current-password" aria-required="true" aria-describedby="pwd-tip">
+            <button type="button" class="eye" id="eyeBtn" aria-label="显示密码" aria-pressed="false">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="tip" id="pwd-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span class="tip-t">用户名或密码错误</span></div>
+        </div>
+
+        <div class="row">
+          <label class="remember"><input type="checkbox" id="remember"> 记住我</label>
+          <a href="#" class="forgot" id="forgot">忘记密码？</a>
+        </div>
+
+        <button type="submit" class="login" id="loginBtn">
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="txt">登录</span>
+        </button>
+
+        <div class="divider">或使用第三方账号登录</div>
+        <div class="social">
+          <button type="button" class="sbtn" aria-label="使用企业微信登录">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4C5 4 2 6.6 2 9.8c0 1.8.9 3.4 2.4 4.5L4 17l2.6-1.3c.6.2 1.3.3 2 .4a5 5 0 0 1 8-3.2" stroke="#0F4C81" stroke-width="1.6" stroke-linejoin="round"/><path d="M15 10c-3 0-5.4 2.1-5.4 4.7S12 19.4 15 19.4c.6 0 1.2-.1 1.7-.3L19 21l-.5-2c1.2-.9 1.9-2.2 1.9-3.6C20.4 12.1 18 10 15 10z" fill="#0E8A5F"/></svg>
+            <span>企业微信</span>
+          </button>
+          <button type="button" class="sbtn" aria-label="使用钉钉登录">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2C6.5 2 2 6 2 11c0 2.6 1.3 4.9 3.4 6.4L6 21l3.6-1.8c.8.2 1.6.3 2.4.3 5.5 0 10-4 10-9S17.5 2 12 2z" stroke="#145A96" stroke-width="1.6"/><path d="M8 12l2.5 2.5L16 9" stroke="#145A96" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>钉钉</span>
+          </button>
+          <button type="button" class="sbtn" aria-label="使用飞书登录">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 16c4 1 8-1 11-6-1 5 0 8 5 8-3 2-8 3-12 1-3-1-4-3-4-3z" fill="#0F4C81"/><path d="M4 16c5-2 9-6 12-11-1 5-2 8-5 11" stroke="#1a6aa8" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span>飞书</span>
+          </button>
+          <button type="button" class="sbtn" aria-label="使用 GitHub 登录">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2C6.5 2 2 6.6 2 12.3c0 4.5 2.9 8.3 6.8 9.7.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.4-3.4-1.4-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.3-1.1.6-1.4-2.2-.3-4.6-1.2-4.6-5.2 0-1.1.4-2.1 1-2.8-.1-.3-.4-1.4.1-2.8 0 0 .8-.3 2.7 1a9 9 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.5.1 2.8.6.7 1 1.7 1 2.8 0 4-2.4 4.9-4.6 5.2.4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5 3.9-1.4 6.8-5.2 6.8-9.7C22 6.6 17.5 2 12 2z" fill="#232A31"/></svg>
+            <span>GitHub</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <p class="lfoot">© 2026 BOSS智库 · 企业级智能知识库系统 ｜ <a href="#">服务条款</a> · <a href="#">隐私政策</a></p>
+  </section>
+
+  <!-- ================= RIGHT: value prop ================= -->
+  <aside class="right">
+    <div class="rmax">
+      <div class="rhead">为什么选择 BOSS智库</div>
+      <div class="rtitle">让企业知识检索，快人一步</div>
+
+      <div class="vals">
+        <div class="val">
+          <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0E8A5F" stroke-width="2" aria-hidden="true"><path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <div><div class="vt">私有化部署 · 数据不出内网</div><div class="vd">文档、切片、向量全链路本地留存，满足合规与备案要求。</div></div>
+        </div>
+        <div class="val">
+          <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97e06" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <div><div class="vt">知识库 + 联网 融合检索</div><div class="vd">倒排融合与重排序双通道，答案附带 5 星相关度与可溯源引用。</div></div>
+        </div>
+        <div class="val">
+          <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#145A96" stroke-width="2" aria-hidden="true"><path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/></svg></span>
+          <div><div class="vt">导入即用 · 全流程可视</div><div class="vd">PDF/MD 拖拽上传，节点日志透明到每一步耗时，失败即时定位。</div></div>
+        </div>
+      </div>
+
+      <div class="rhead" style="margin:24px 0 8px">平台实时看板</div>
+      <div class="metrics">
+        <div class="mc"><div class="mlbl">已导入文档</div><div class="mval">3</div><div class="mtrend up">↑ 12%</div></div>
+        <div class="mc"><div class="mlbl">切片总数</div><div class="mval">19</div><div class="mtrend up">↑ 1</div></div>
+        <div class="mc hot"><div class="mlbl">今日问答</div><div class="mval">128</div><div class="mtrend up">↑ 12%</div></div>
+        <div class="mc"><div class="mlbl">平均首字延迟</div><div class="mval">8.2<small>s</small></div><div class="mtrend down">↓ 0.6s</div></div>
+      </div>
+
+      <div class="trust" style="margin-top:16px" aria-label="安全与合规">
+        <div class="trow">
+          <div class="tb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0E8A5F" stroke-width="2" aria-hidden="true"><path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5z"/><path d="M9 12l2 2 4-4"/></svg>私有化部署</div>
+          <div class="tb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0E8A5F" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>传输加密</div>
+          <div class="tb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0E8A5F" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>SOC2</div>
+          <div class="tb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0E8A5F" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>ICP 备案</div>
+        </div>
+      </div>
+
+      <div class="rc">
+        <button class="cta" id="trialCta" type="button">免费试用</button>
+        <span class="note">无需信用卡 · 支持私有化 POC</span>
+      </div>
+
+      <div class="faq">
+        <div class="qh">常见问题</div>
+        <div class="qa">
+          <button type="button" aria-expanded="false">忘记密码或账号被锁定怎么办？<svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+          <div class="ans">点击登录框右上角「忘记密码」，通过管理员重置或绑定的手机号/邮箱找回；连续输错会临时锁定，请稍后再试或联系企业管理员解锁。</div>
+        </div>
+        <div class="qa">
+          <button type="button" aria-expanded="false">是否支持企业微信 / 钉钉等单点登录？<svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+          <div class="ans">支持。可在下方使用企业微信、钉钉、飞书、GitHub 一键登录，企业管理员在后台配置可信域名后即可免密进入工作台。</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s,r){return (r||document).querySelector(s);};
+  var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+  function toast(m){var t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove("show");},2200);}
+
+  /* password show/hide */
+  var pwd=$("#pwd"),eye=$("#eyeBtn");
+  var eyeOn='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var eyeOff='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.5 7.5A16 16 0 0 0 2 12s3.5 7 10 7c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  eye.addEventListener("click",function(){
+    var show=pwd.type==="password";
+    pwd.type=show?"text":"password";
+    eye.innerHTML=show?eyeOff:eyeOn;
+    eye.setAttribute("aria-label",show?"隐藏密码":"显示密码");
+    eye.setAttribute("aria-pressed",show?"true":"false");
+    pwd.focus();
+  });
+
+  /* clear error on input */
+  function clearErr(f){$("#f-"+f).classList.remove("err");}
+  $("#account").addEventListener("input",function(){clearErr("account");});
+  pwd.addEventListener("input",function(){clearErr("pwd");});
+
+  /* submit validation + loading */
+  var btn=$("#loginBtn");
+  $("#loginForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var acc=$("#account").value.trim(),pw=pwd.value;
+    var bad=false;
+    if(!acc){var fa=$("#f-account");fa.classList.add("err");fa.querySelector(".tip-t").textContent="请输入账号";bad=true;}
+    if(!pw){var fp=$("#f-pwd");fp.classList.add("err");fp.querySelector(".tip-t").textContent="请输入密码";bad=true;}
+    if(bad){toast("请完善必填项");return;}
+    btn.classList.add("loading");btn.setAttribute("disabled","disabled");
+    btn.querySelector(".txt").textContent="登录中…";
+    setTimeout(function(){
+      btn.classList.remove("loading");btn.removeAttribute("disabled");
+      btn.querySelector(".txt").textContent="登录";
+      toast("（Demo 模拟）登录成功，正在进入知识库工作台…");
+    },1200);
+  });
+
+  /* remember + forgot */
+  $("#remember").addEventListener("change",function(e){toast(e.target.checked?"已记住此设备登录状态":"已取消记住我");});
+  $("#forgot").addEventListener("click",function(e){e.preventDefault();toast("已向绑定手机/邮箱发送重置链接（Demo）");});
+
+  /* third-party login */
+  $$(".sbtn").forEach(function(b){b.addEventListener("click",function(){toast(b.getAttribute("aria-label")+"：Demo 演示，未跳转");});});
+
+  /* trial CTA */
+  $("#trialCta").addEventListener("click",function(){toast("免费试用已申请，稍后为您开通");});
+
+  /* FAQ collapse */
+  $$(".qa > button").forEach(function(b){
+    b.addEventListener("click",function(){
+      var qa=b.parentElement,open=qa.classList.toggle("open");
+      b.setAttribute("aria-expanded",open?"true":"false");
+    });
+  });
+})();
+</script>
+</body>
+</html>

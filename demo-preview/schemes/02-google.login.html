@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  ============================================================================
+  方案编号：02 · 风格名：Google Material You (Material Design 3) — 登录页
+  负责子智能体：Sub-Agent-Google-MD3
+  设计系统要点：
+   1. 背景视觉用 MD3 tonal palette 分层（primary #6750A4 → primaryContainer
+      #EADDFF → tertiaryContainer #FFD8E4 的大色块 + 4dp 网格），离线内联，
+      不用 Material 2 饱和蓝红；登录卡用 surface container lowest + elevation 3。
+   2. 形状层级成体系：文本框 4–8px（MD3 text field 特征）、按钮/chip 全胶囊
+      999px、卡片 28px（shape-xl，MD3 登录/对话框常用大圆角）。
+   3. 签名交互：全元素 ripple 涟漪（JS 坐标生成 span，300ms）+ 8% state layer；
+      filled/outlined text field 的 label 浮动 notch；MD3 switch 记住我；
+      登录按钮 loading 态用 indeterminate 线性进度；错误态 error container + 描边。
+  ============================================================================
+-->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · BOSS智库知识库 · Material You 方案02</title>
+<style>
+/* ==========================================================================
+   1. MD3 DESIGN TOKENS（与主页面同源，保证 10 套内一致性）
+   ========================================================================== */
+:root{
+  --md-primary:#6750A4; --md-on-primary:#FFFFFF;
+  --md-primary-container:#EADDFF; --md-on-primary-container:#21005D;
+  --md-secondary-container:#E8DEF8; --md-on-secondary-container:#1D192B;
+  --md-tertiary:#7D5260; --md-tertiary-container:#FFD8E4; --md-on-tertiary-container:#31111D;
+  --md-error:#B3261E; --md-on-error:#FFFFFF;
+  --md-error-container:#F9DEDC; --md-on-error-container:#410E0B;
+  --md-surface:#FFFBFE; --md-on-surface:#1C1B1F; --md-on-surface-variant:#49454F;
+  --md-outline:#79747E; --md-outline-variant:#CAC4D0;
+  --md-surface-container-lowest:#FFFFFF; --md-surface-container-low:#F7F2FA;
+  --md-surface-container:#F3EDF7; --md-surface-container-high:#ECE6F0;
+  --md-inverse-surface:#322F35; --md-inverse-on-surface:#F4EFF4; --md-inverse-primary:#D0BCFF;
+  --elev-1:0 1px 2px rgba(0,0,0,.30), 0 1px 3px 1px rgba(0,0,0,.15);
+  --elev-2:0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
+  --elev-3:0 1px 3px rgba(0,0,0,.30), 0 4px 8px 3px rgba(0,0,0,.15);
+  --shape-full:999px; --shape-xl:28px; --shape-lg:16px; --shape-md:12px; --shape-sm:8px; --shape-xs:4px;
+  --sp-4:4px; --sp-8:8px; --sp-12:12px; --sp-16:16px; --sp-24:24px; --sp-32:32px;
+  --motion-in:cubic-bezier(.2,0,0,1); --motion-out:cubic-bezier(.4,0,.2,1);
+  --font-sys:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",Roboto,sans-serif;
+  /* MD3 type scale tokens（字号/字重照 token，字体回落系统栈） */
+  --ts-headline-sm:24px;  /* headlineSmall  24 / 400 */
+  --ts-title-lg:22px;     /* titleLarge     22 / 400 */
+  --ts-title-md:16px;     /* titleMedium    16 / 500 */
+  --ts-body-lg:16px;      /* bodyLarge      16 / 400 */
+  --ts-body-md:14px;      /* bodyMedium     14 / 400 */
+  --ts-body-sm:12px;      /* bodySmall      12 / 400 */
+  --ts-label-lg:14px;     /* labelLarge     14 / 500 */
+  --ts-label-md:12px;     /* labelMedium    12 / 500 */
+  --ts-label-sm:11px;     /* labelSmall     11 / 500 */
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;font-family:var(--font-sys);font-size:var(--ts-body-md);line-height:1.5;
+  color:var(--md-on-surface);background:var(--md-surface);-webkit-font-smoothing:antialiased;
+  display:flex;min-height:100dvh;
+}
+h1,p,ul{margin:0;padding:0}
+ul{list-style:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input{font:inherit;color:inherit}
+a{color:var(--md-primary);text-decoration:none}
+:focus-visible{outline:2px solid var(--md-primary);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  .rp{display:none!important}
+}
+
+/* ---------- ripple + state layer（MD3 签名交互） ---------- */
+.ink{position:relative;overflow:hidden;isolation:isolate}
+.ink::after{content:"";position:absolute;inset:0;background:var(--md-primary);opacity:0;
+  pointer-events:none;transition:opacity .15s var(--motion-out);z-index:0}
+.ink:hover::after{opacity:.08}
+.ink:focus-visible::after{opacity:.12}
+.ink:active::after{opacity:.12}
+.ink > *{position:relative;z-index:1}
+.rp{position:absolute;border-radius:50%;transform:scale(0);pointer-events:none;z-index:0;
+  background:currentColor;opacity:.20;animation:rpgo .3s var(--motion-out) forwards}
+@keyframes rpgo{to{transform:scale(1);opacity:0}}
+
+/* ==========================================================================
+   2. 背景视觉：MD3 tonal palette 大色块 + 4dp 网格（纯内联，离线）
+   ========================================================================== */
+.bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.bg .t-blob{position:absolute;border-radius:50%;filter:blur(.2px);opacity:.9}
+.bg .b1{width:520px;height:520px;left:-160px;top:-140px;background:var(--md-primary-container)}
+.bg .b2{width:380px;height:380px;right:-120px;bottom:-100px;background:var(--md-tertiary-container)}
+.bg .b3{width:200px;height:200px;right:16%;top:8%;background:var(--md-secondary-container)}
+.bg .b4{width:120px;height:120px;left:22%;bottom:12%;background:var(--md-primary);opacity:.14}
+.bg .grid{position:absolute;inset:0;opacity:.5;
+  background-image:linear-gradient(to right,rgba(121,116,126,.14) 1px,transparent 1px),
+                   linear-gradient(to bottom,rgba(121,116,126,.14) 1px,transparent 1px);
+  background-size:24px 24px}
+.bg .scrim{position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,251,254,.2),rgba(243,237,247,.85))}
+
+/* ==========================================================================
+   3. 两栏：品牌叙事侧 + 登录卡（MD3 split layout，24dp 栅格）
+   ========================================================================== */
+.wrap{position:relative;z-index:1;flex:1;display:grid;grid-template-columns:1.05fr minmax(420px,.95fr);
+  align-items:center;gap:var(--sp-32);padding:var(--sp-32) var(--sp-32) var(--sp-32) var(--sp-32);
+  width:100%;max-width:1440px;margin:0 auto}
+
+/* --- 品牌区 --- */
+.brand-side{display:flex;flex-direction:column;gap:var(--sp-24);max-width:520px}
+.logo-row{display:flex;align-items:center;gap:var(--sp-16)}
+.logo{width:64px;height:64px;border-radius:var(--shape-lg);background:var(--md-primary);color:var(--md-on-primary);
+  display:grid;place-items:center;box-shadow:var(--elev-2);flex:0 0 auto}
+.logo svg{width:34px;height:34px}
+.brand-side h1{font-size:var(--ts-headline-sm);font-weight:400;line-height:1.2}
+.brand-side .sub{font-size:var(--ts-body-md);color:var(--md-on-surface-variant)}
+.claim{font-size:28px;font-weight:400;line-height:1.3;letter-spacing:-.2px;color:var(--md-on-primary-container)}
+.claim b{font-weight:500}
+/* MD3 assist chip 组合作为卖点列表 */
+.feat{display:flex;flex-wrap:wrap;gap:var(--sp-8)}
+.feat li{border:1px solid var(--md-outline);border-radius:var(--shape-full);padding:8px 16px;
+  font-size:var(--ts-label-lg);font-weight:500;color:var(--md-on-surface-variant);
+  display:inline-flex;align-items:center;gap:8px;background:rgba(255,251,254,.6)}
+.feat svg{width:16px;height:16px;color:var(--md-primary)}
+.tonal-strip{display:flex;height:12px;border-radius:var(--shape-full);overflow:hidden;max-width:320px}
+.tonal-strip i{flex:1}
+
+/* ==========================================================================
+   4. 登录卡（surface-container-lowest · shape-xl · elevation 3）
+   ========================================================================== */
+.card{background:var(--md-surface-container-lowest);border-radius:var(--shape-xl);padding:var(--sp-32);
+  box-shadow:var(--elev-3);max-width:464px;width:100%;justify-self:end}
+.card .card-top{display:flex;align-items:center;gap:12px;margin-bottom:var(--sp-8)}
+.card .card-top .m{width:40px;height:40px;border-radius:var(--shape-md);background:var(--md-primary-container);
+  color:var(--md-on-primary-container);display:grid;place-items:center}
+.card h2{font-size:var(--ts-title-lg);font-weight:400}
+.card .desc{font-size:var(--ts-body-md);color:var(--md-on-surface-variant);margin-bottom:var(--sp-24)}
+
+/* --- MD3 text field：filled 变体 + label 浮动 notch --- */
+.field{position:relative;margin-bottom:var(--sp-24)}
+.field .ctl{
+  width:100%;display:block;border:0;border-bottom:1px solid var(--md-outline);
+  background:var(--md-surface-container-high);border-radius:var(--shape-sm) var(--shape-sm) 0 0;
+  padding:24px var(--sp-16) 10px 44px;font-size:var(--ts-body-lg);min-height:56px;
+  transition:background .15s var(--motion-out);
+}
+.field:hover .ctl{background:var(--md-surface-container-highest)}
+.field:focus-within .ctl{border-bottom:2px solid var(--md-primary);padding-bottom:9px}
+.field .lb{position:absolute;left:44px;top:17px;padding:0 4px;font-size:var(--ts-body-lg);
+  color:var(--md-on-surface-variant);pointer-events:none;transition:.15s var(--motion-out);white-space:nowrap}
+.field .ic{position:absolute;left:12px;top:16px;width:22px;height:22px;color:var(--md-on-surface-variant)}
+.field:focus-within .ic{color:var(--md-primary)}
+.field.floated .lb,
+.field:focus-within .lb{top:2px;font-size:var(--ts-label-sm);color:var(--md-primary);font-weight:500}
+.field .support{position:absolute;right:0;bottom:-18px;font-size:var(--ts-label-sm);color:var(--md-on-surface-variant)}
+.field .reveal{position:absolute;right:4px;top:10px;width:40px;height:40px;border-radius:var(--shape-full);
+  display:grid;place-items:center;color:var(--md-on-surface-variant)}
+.field .reveal svg{width:22px;height:22px}
+/* 错误态：error 描边 + error container 提示 */
+.field.err .ctl{border-bottom:2px solid var(--md-error);background:var(--md-error-container);padding-bottom:9px}
+.field.err .ic{color:var(--md-error)}
+.field.err .lb{color:var(--md-error)}
+.field .err-txt{display:none;align-items:center;gap:6px;font-size:var(--ts-label-sm);color:var(--md-error);
+  margin-top:6px;font-weight:500}
+.field .err-txt svg{width:16px;height:16px;flex:0 0 auto}
+.field.err .err-txt{display:flex}
+.field.err .support{display:none}
+
+/* --- 记住我（MD3 switch） + 忘记密码 --- */
+.between{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-12);margin-bottom:var(--sp-24)}
+.sw{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:var(--ts-body-md);color:var(--md-on-surface-variant)}
+.sw input{position:absolute;opacity:0;width:0;height:0}
+.sw .track{width:52px;height:32px;border-radius:var(--shape-full);background:var(--md-surface-container-highest);
+  border:2px solid var(--md-outline);position:relative;transition:background .2s var(--motion-out),border-color .2s}
+.sw .thumb{position:absolute;top:50%;left:6px;width:16px;height:16px;border-radius:var(--shape-full);
+  background:var(--md-outline);transform:translateY(-50%);transition:.2s var(--motion-out)}
+.sw input:checked + .track{background:var(--md-primary);border-color:var(--md-primary)}
+.sw input:checked + .track .thumb{left:28px;width:24px;height:24px;background:var(--md-on-primary)}
+.sw input:focus-visible + .track{outline:2px solid var(--md-primary);outline-offset:2px}
+.link{border-radius:var(--shape-full);padding:8px 12px;font-size:var(--ts-label-lg);font-weight:500;color:var(--md-primary)}
+
+/* --- 主 CTA：MD3 全胶囊按钮 + hover / focus / active / disabled / loading --- */
+.cta{width:100%;border-radius:var(--shape-full);min-height:48px;background:var(--md-primary);
+  color:var(--md-on-primary);font-size:var(--ts-label-lg);font-weight:500;display:inline-flex;
+  align-items:center;justify-content:center;gap:10px;letter-spacing:.1px;transition:box-shadow .15s var(--motion-out),filter .15s}
+.cta svg{width:20px;height:20px}
+.cta:hover{box-shadow:var(--elev-2)}                    /* hover：elevation 1→2 */
+.cta:focus-visible{outline:2px solid var(--md-on-primary-container);outline-offset:-4px;box-shadow:var(--elev-2)}
+.cta:active{filter:brightness(.94)}
+.cta[disabled]{background:rgba(28,27,31,.12);color:rgba(28,27,31,.38);box-shadow:none;pointer-events:none}
+.cta.loading{pointer-events:none}
+/* MD3 线性进度指示器（indeterminate）用于 loading 态 */
+.lin{height:3px;border-radius:var(--shape-full);background:var(--md-primary-container);overflow:hidden;position:relative;margin-top:12px}
+.lin i{position:absolute;inset:0 auto 0 0;width:40%;background:var(--md-primary);animation:sweep 1.4s var(--motion-out) infinite}
+.lin.det i{animation:none;width:var(--v,0%);transition:width .3s var(--motion-out)}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+.lin[hidden]{display:none}
+.hint-load{font-size:var(--ts-label-sm);color:var(--md-on-surface-variant);margin-top:8px;display:none}
+.loading ~ .hint-load{display:block}
+
+/* --- 分隔线 + 第三方登录 --- */
+.divider{display:flex;align-items:center;gap:var(--sp-16);margin:var(--sp-24) 0;font-size:var(--ts-body-sm);
+  color:var(--md-on-surface-variant)}
+.divider::before,.divider::after{content:"";height:1px;flex:1;background:var(--md-outline-variant)}
+.oauth{display:flex;justify-content:center;gap:var(--sp-12)}
+.oa{width:56px;height:56px;border-radius:var(--shape-full);border:1px solid var(--md-outline-variant);
+  background:var(--md-surface);display:grid;place-items:center;color:var(--md-on-surface-variant);
+  transition:border-color .15s var(--motion-out),background .15s}
+.oa:hover{background:var(--md-secondary-container);border-color:transparent;color:var(--md-on-secondary-container)}
+.oa svg{width:26px;height:26px}
+.oa-labels{text-align:center;font-size:var(--ts-label-sm);color:var(--md-on-surface-variant);margin-top:10px}
+.foot{margin-top:var(--sp-24);text-align:center;font-size:var(--ts-body-sm);color:var(--md-on-surface-variant)}
+.foot a{font-weight:500}
+
+/* --- MD3 snackbar（失败态提示） --- */
+.snack{position:fixed;bottom:24px;left:50%;transform:translate(-50%,150%);z-index:40;
+  background:var(--md-inverse-surface);color:var(--md-inverse-on-surface);border-radius:var(--shape-sm);
+  padding:14px 16px;box-shadow:var(--elev-3);display:flex;align-items:center;gap:var(--sp-16);
+  font-size:var(--ts-body-md);max-width:min(560px,92vw);transition:transform .28s var(--motion-out)}
+.snack.up{transform:translate(-50%,0)}
+.snack button{color:var(--md-inverse-primary);border-radius:var(--shape-full);padding:6px 12px;font-size:var(--ts-label-lg);font-weight:500}
+
+/* ==========================================================================
+   5. RESPONSIVE  1440 / 1024 / 768 / 390
+   ========================================================================== */
+@media (max-width:1180px){
+  .wrap{grid-template-columns:minmax(0,1fr) minmax(0,464px);padding:var(--sp-24)}
+  .claim{font-size:24px}
+}
+@media (max-width:1023px){
+  .wrap{grid-template-columns:minmax(0,1fr);gap:var(--sp-24);justify-items:center;padding:var(--sp-24) var(--sp-16)}
+  .card{justify-self:stretch;max-width:520px;margin:0 auto}
+  .brand-side{max-width:520px}
+  .bg .b1{width:320px;height:320px;left:-110px;top:-110px}
+  .bg .b2{width:260px;height:260px}
+}
+@media (max-width:767px){
+  .claim{display:none}
+  .feat li:nth-child(n+4){display:none}
+  .card{padding:var(--sp-24);border-radius:var(--shape-lg)}
+  .oauth{flex-wrap:wrap}
+}
+@media (max-width:390px){
+  body{display:block}
+  .wrap{padding:16px 12px 24px;gap:16px}
+  .logo{width:48px;height:48px}
+  .logo svg{width:26px;height:26px}
+  .brand-side h1{font-size:20px}
+  .card{padding:20px 16px}
+  .field .ctl{padding-left:40px}
+  .field .lb{left:40px}
+  .oa{width:52px;height:52px}
+  .between{flex-wrap:wrap}
+  .tonal-strip{max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- 背景视觉层（离线内联，无外部资源） -->
+<div class="bg" aria-hidden="true">
+  <span class="t-blob b1"></span><span class="t-blob b2"></span>
+  <span class="t-blob b3"></span><span class="t-blob b4"></span>
+  <span class="grid"></span><span class="scrim"></span>
+</div>
+
+<div class="wrap">
+  <!-- ==================== 品牌区 ==================== -->
+  <section class="brand-side">
+    <div class="logo-row">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 8l10 5 10-5-10-5Zm0 9.2L4.6 8.8 12 5.4l7.4 3.4L12 12.2ZM4 12.6l2 1.1 6 3.4 6-3.4 2-1.1V17l-8 4.5L4 17v-4.4Z"/></svg>
+      </span>
+      <div>
+        <h1>BOSS智库知识库</h1>
+        <p class="sub">企业级智能知识库系统 · Material You 界面</p>
+      </div>
+    </div>
+
+    <p class="claim">把 <b>文档、切片与答案</b> 放进同一条检索链路，<br>随问随答，来源可溯。</p>
+
+    <ul class="feat">
+      <li><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2Z"/></svg>知识检索 Chat</li>
+      <li><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96ZM14 13v4h-4v-4H7l5-5 5 5h-3Z"/></svg>PDF 一键导入</li>
+      <li><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>阶段进度可视</li>
+      <li><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Zm0 16H6V4h2v6l2.5-1.5L13 10V4h5v14Z"/></svg>8 条参考来源</li>
+      <li><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4Z"/></svg>企业级权限</li>
+    </ul>
+
+    <!-- MD3 tonal palette 展示条：primary 40/80/90/95 色调层级 -->
+    <div class="tonal-strip" aria-hidden="true">
+      <i style="background:#21005D"></i><i style="background:#4F378B"></i><i style="background:#6750A4"></i>
+      <i style="background:#9A82DB"></i><i style="background:#EADDFF"></i><i style="background:#F6F2FA"></i>
+    </div>
+  </section>
+
+  <!-- ==================== 登录卡 ==================== -->
+  <main class="card">
+    <div class="card-top">
+      <span class="m" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z"/></svg>
+      </span>
+      <h2>登录以继续</h2>
+    </div>
+    <p class="desc">使用企业账号访问知识检索与文档导入工作台。</p>
+
+    <form id="loginForm" autocomplete="off" novalidate>
+      <!-- 账号 -->
+      <div class="field" id="fUser">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z"/></svg>
+        <input class="ctl" id="user" type="text" placeholder=" " aria-describedby="userErr">
+        <label class="lb" for="user">手机号 / 邮箱 / 用户名</label>
+        <p class="err-txt" id="userErr">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+          请输入账号
+        </p>
+      </div>
+
+      <!-- 密码（含显示/隐藏切换 + 静态展示一条校验错误） -->
+      <div class="field err" id="fPwd">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2Zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm3-9H9V6a3 3 0 0 1 6 0v2Z"/></svg>
+        <input class="ctl" id="pwd" type="password" value="boss1234" placeholder=" "
+               style="padding-right:56px" aria-describedby="pwdErr">
+        <label class="lb" for="pwd">密码</label>
+        <button class="reveal ink" type="button" id="reveal" aria-label="显示密码" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="currentColor" id="eye"><path d="M12 5C7 5 3 8.5 2 12c1 3.5 5 7 10 7s9-3.5 10-7c-1-3.5-5-7-10-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>
+        </button>
+        <p class="err-txt" id="pwdErr">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+          <span id="pwdErrMsg">用户名或密码错误</span>
+        </p>
+      </div>
+
+      <!-- 记住我（MD3 switch） + 忘记密码 -->
+      <div class="between">
+        <label class="sw">
+          <input type="checkbox" id="remember" checked>
+          <span class="track"><span class="thumb"></span></span>
+          <span>记住我</span>
+        </label>
+        <a class="link ink" href="#" id="forgot">忘记密码？</a>
+      </div>
+
+      <!-- 主 CTA：hover / focus / active / disabled / loading 态齐备 -->
+      <button class="cta ink" type="submit" id="submitBtn">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 7 8 10l1.4 1.4L12 8.8l2.6 2.6L16 10l-3-3Zm1 10 3-3-1.4-1.4L12 14.2l-2.6-2.6L8 13l3 3Z"/></svg>
+        <span id="ctaText">登录</span>
+      </button>
+      <span class="lin" id="lin" hidden><i></i></span>
+      <p class="hint-load" id="hintLoad" style="display:none">正在校验企业账号（离线模拟，不发起真实请求）…</p>
+    </form>
+
+    <!-- 分隔线 + 第三方登录四图标 -->
+    <div class="divider">或使用以下方式登录</div>
+    <ul class="oauth">
+      <li><button class="oa ink" type="button" aria-label="使用企业微信登录">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.3 4C5.3 4 2 6.7 2 10c0 1.8 1 3.5 2.6 4.6L4 16.8l2.5-1.2c.6.1 1.2.2 1.9.2h.5a5 5 0 0 1-.2-1.4c0-3 2.9-5.4 6.4-5.4h.6C15.1 6 12.5 4 9.3 4Zm-2.5 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm5 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/><path d="M22 14.3c0-2.7-2.6-4.9-5.8-4.9s-5.8 2.2-5.8 4.9 2.6 4.9 5.8 4.9c.6 0 1.2-.1 1.8-.3l2.2 1.1-.6-1.9c1.5-.9 2.4-2.3 2.4-3.8Zm-7.7-.9a.85.85 0 1 1 0-1.7.85.85 0 0 1 0 1.7Zm4 0a.85.85 0 1 1 0-1.7.85.85 0 0 1 0 1.7Z"/></svg>
+      </button></li>
+      <li><button class="oa ink" type="button" aria-label="使用钉钉登录">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.7 8.1c-.1.4-.6 1.6-1.4 2.9l1.3.4-2.2 2.9-.3-1.1c-.9.2-2 .3-3.1.1-1.8-.3-3-1.3-3.4-2.4l3.7-3.3-2.5.6c-.4-.7-.7-1.5-.7-2 0 0 2.3 1.1 5.6 1.6 2.2.3 3.9-.2 4.6-.6-.2.6-.5 1.2-1 1.6l.8.1c-.1.3-.2.5-.4.7l.5.1-.2.4.7.2-.3.4Z"/></svg>
+      </button></li>
+      <li><button class="oa ink" type="button" aria-label="使用飞书登录">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 18c2.4 1.2 5.4 1.4 8.1.4-2.6-.5-4.6-1.9-5.9-3.6C4.8 10.9 4.4 8.3 5 5.6c1.3.5 2.5 1.3 3.4 2.3 1.5-1.3 3.6-2 5.7-1.7 2.6.3 4.6 1.9 5.4 4 .3.9.3 1.8.1 2.6-.7 2.5-2.9 4.4-5.8 5.1-3.2.8-6.8.1-9.8-2Zm3.9-6.3c1.4 1.7 3.6 2.8 6 2.7 1.9-.1 3.3-.9 3.9-2.2.4-1 .2-2-.4-2.8-.9-1.2-2.6-1.7-4.3-1.3-1.2.3-2.2 1-2.9 1.9l-2.3 1.7Z"/></svg>
+      </button></li>
+      <li><button class="oa ink" type="button" aria-label="使用 GitHub 登录">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.2 3 .9.1-.7.4-1.2.7-1.5-2.2-.3-4.6-1.1-4.6-5a4 4 0 0 1 1-2.7c-.1-.3-.5-1.4.1-2.8 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .6 1.4.2 2.5.1 2.8a4 4 0 0 1 1 2.7c0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 12 2Z"/></svg>
+      </button></li>
+    </ul>
+    <p class="oa-labels">企业微信 · 钉钉 · 飞书 · GitHub</p>
+
+    <p class="foot">© 2026 BOSS智库 · 企业级智能知识库系统 · <a class="ink" href="#" id="tos">服务条款</a></p>
+  </main>
+</div>
+
+<!-- MD3 snackbar -->
+<div class="snack" id="snack" role="status" aria-live="polite">
+  <span id="snackMsg">用户名或密码错误</span>
+  <button type="button" id="snackAct">重试</button>
+</div>
+
+<script>
+/* ==========================================================================
+   MD3 登录页交互（全部本地，零网络）
+   1) ripple 涟漪 2) text field label 浮动 notch 3) 密码显隐 4) switch 记住我
+   5) 提交校验 → 错误态 + snackbar 6) 登录按钮 loading（线性进度）
+   ========================================================================== */
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- 1. ripple ---------- */
+  document.addEventListener("pointerdown", function(e){
+    if(reduce) return;
+    var host = e.target.closest && e.target.closest(".ink");
+    if(!host || host.disabled) return;
+    var r = host.getBoundingClientRect();
+    var d = Math.max(r.width, r.height) * 2;
+    var s = document.createElement("span");
+    s.className = "rp";
+    s.style.width = s.style.height = d + "px";
+    s.style.left = (e.clientX - r.left - d/2) + "px";
+    s.style.top  = (e.clientY - r.top  - d/2) + "px";
+    host.appendChild(s);
+    setTimeout(function(){ if(s.parentNode) s.parentNode.removeChild(s); }, 320);
+  }, {passive:true});
+
+  /* ---------- 2. filled text field：有值即 floated（MD3 label 上浮到顶部 notch） ---------- */
+  var fields = document.querySelectorAll(".field");
+  Array.prototype.forEach.call(fields, function(f){
+    var ctl = f.querySelector(".ctl");
+    if(ctl.value.trim()) f.classList.add("floated");
+    ctl.addEventListener("input", function(){
+      f.classList.toggle("floated", !!ctl.value.trim());
+      if(f.classList.contains("err")) f.classList.remove("err");
+    });
+    ctl.addEventListener("blur", function(){
+      f.classList.toggle("floated", !!ctl.value.trim());
+    });
+  });
+
+  /* ---------- 3. 密码显示 / 隐藏 ---------- */
+  var pwd = document.getElementById("pwd"), reveal = document.getElementById("reveal");
+  var eyeOn = '<path d="M12 5C7 5 3 8.5 2 12c1 3.5 5 7 10 7s9-3.5 10-7c-1-3.5-5-7-10-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/>';
+  /* 隐藏态：眼睛 + 斜线（MD3 visibility_off） */
+  var eyeOff = '<path d="M12 5C7 5 3 8.5 2 12c1 3.5 5 7 10 7s9-3.5 10-7c-1-3.5-5-7-10-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" opacity=".45"/><path d="M3 3.6 21.4 22 22.8 20.6 4.4 2.2 3 3.6Z" stroke="currentColor" stroke-width="1.4"/>';
+  reveal.addEventListener("click", function(){
+    var show = pwd.type === "password";
+    pwd.type = show ? "text" : "password";
+    reveal.setAttribute("aria-pressed", show ? "true" : "false");
+    reveal.setAttribute("aria-label", show ? "隐藏密码" : "显示密码");
+    document.getElementById("eye").innerHTML = show ? eyeOff : eyeOn;
+    pwd.focus();
+  });
+
+  /* ---------- 4. snackbar ---------- */
+  var snack = document.getElementById("snack"), sTimer = null;
+  function sn(msg){
+    document.getElementById("snackMsg").textContent = msg;
+    snack.classList.add("up");
+    clearTimeout(sTimer);
+    sTimer = setTimeout(function(){ snack.classList.remove("up"); }, 3400);
+  }
+  document.getElementById("snackAct").addEventListener("click", function(){ snack.classList.remove("up"); });
+
+  /* ---------- 5. 表单校验 + 6. loading 态 ---------- */
+  var form = document.getElementById("loginForm"),
+      fUser = document.getElementById("fUser"), fPwd = document.getElementById("fPwd"),
+      user = document.getElementById("user"), btn = document.getElementById("submitBtn"),
+      lin = document.getElementById("lin"), hint = document.getElementById("hintLoad"),
+      ctaText = document.getElementById("ctaText");
+
+  /* 密码错误演示用的固定值（BRIEF 要求静态展示一条校验错误） */
+  var WRONG_PWD = "boss1234";
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var ok = true, msg = "";
+    if(!user.value.trim()){ fUser.classList.add("err"); ok = false; }
+    else fUser.classList.remove("err");
+    if(!pwd.value){ fPwd.classList.add("err"); msg = "请输入密码"; ok = false; }
+    else if(pwd.value === WRONG_PWD){ fPwd.classList.add("err"); msg = "用户名或密码错误"; ok = false; }
+    else fPwd.classList.remove("err");
+    if(msg) document.getElementById("pwdErrMsg").textContent = msg;
+    if(!ok){ sn("登录失败：请检查账号与密码"); return; }
+
+    /* loading：按钮禁用 + MD3 indeterminate 线性进度 */
+    btn.classList.add("loading"); btn.disabled = true;
+    ctaText.textContent = "正在登录…"; lin.hidden = false; hint.style.display = "block";
+    setTimeout(function(){
+      btn.classList.remove("loading"); btn.disabled = false;
+      ctaText.textContent = "登录"; lin.hidden = true; hint.style.display = "none";
+      sn("校验通过（Demo 不跳转，未发起真实请求）");
+    }, 1600);
+  });
+
+  /* ---------- 其他可点元素反馈 ---------- */
+  document.getElementById("forgot").addEventListener("click", function(e){
+    e.preventDefault(); sn("重置链接已发送到企业邮箱（离线模拟）");
+  });
+  document.getElementById("tos").addEventListener("click", function(e){
+    e.preventDefault(); sn("服务条款为静态内容，本 Demo 不跳转");
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".oa"), function(b){
+    b.addEventListener("click", function(){ sn(b.getAttribute("aria-label") + " — 未接入真实第三方登录"); });
+  });
+})();
+</script>
+</body>
+</html>

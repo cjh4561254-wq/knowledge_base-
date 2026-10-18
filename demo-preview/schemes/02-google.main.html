@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  ============================================================================
+  方案编号：02 · 风格名：Google Material You (Material Design 3)
+  负责子智能体：Sub-Agent-Google-MD3
+  设计系统要点：
+   1. 固定 tonal palette 模拟 MD3 动态取色（primary #6750A4 / primaryContainer
+      #EADDFF / onPrimaryContainer #21005D），分区靠 surface container 色阶，
+      不靠描边；禁用 Material 2 的饱和蓝红大色块。
+   2. 形状即语义（shape as expression）：按钮/chip/segmented 全胶囊 999px、
+      卡片 16px、Fab 16px、nav 指示器全胶囊；层级靠 surface tint + elevation
+      overlay（0/1/2/3/5）而非重投影。
+   3. 签名交互动效：点击涟漪 ripple（JS 按坐标生成 span，300ms 扩散）覆盖所有
+      按钮/卡片/nav/列表项；hover 用 8% state layer 叠加；排版严格照 MD3
+      type scale token（headlineSmall 24/400 … labelLarge 14/500）。
+  ============================================================================
+-->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOSS智库知识库 · Material You 方案02</title>
+<style>
+/* ==========================================================================
+   1. MD3 DESIGN TOKENS  (color roles · elevation · shape · typography)
+   ========================================================================== */
+:root{
+  /* --- color roles: baseline tonal palette (MD3 dynamic-color 观感) --- */
+  --md-primary:#6750A4;
+  --md-on-primary:#FFFFFF;
+  --md-primary-container:#EADDFF;
+  --md-on-primary-container:#21005D;
+  --md-secondary-container:#E8DEF8;
+  --md-on-secondary-container:#1D192B;
+  --md-tertiary:#7D5260;
+  --md-tertiary-container:#FFD8E4;
+  --md-on-tertiary-container:#31111D;
+  --md-error:#B3261E;
+  --md-on-error:#FFFFFF;
+  --md-error-container:#F9DEDC;
+  --md-on-error-container:#410E0B;
+  --md-surface:#FFFBFE;
+  --md-on-surface:#1C1B1F;
+  --md-on-surface-variant:#49454F;      /* 次要文字，对白对比 7.4:1 */
+  --md-outline:#79747E;
+  --md-outline-variant:#CAC4D0;
+  --md-surface-container-lowest:#FFFFFF;
+  --md-surface-container-low:#F7F2FA;
+  --md-surface-container:#F3EDF7;
+  --md-surface-container-high:#ECE6F0;
+  --md-surface-container-highest:#E6E0E9;
+  --md-inverse-surface:#322F35;
+  --md-inverse-on-surface:#F4EFF4;
+  --md-inverse-primary:#D0BCFF;
+  --md-success:#2E6B4F;                  /* tonal 绿，非饱和 Material2 绿 */
+  --md-success-container:#D6E9DE;
+
+  /* --- elevation levels: surface tint + shadow overlay --- */
+  --elev-0:none;
+  --elev-1:0 1px 2px rgba(0,0,0,.30), 0 1px 3px 1px rgba(0,0,0,.15);
+  --elev-2:0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
+  --elev-3:0 1px 3px rgba(0,0,0,.30), 0 4px 8px 3px rgba(0,0,0,.15);
+  --elev-5:0 2px 4px rgba(0,0,0,.30), 0 8px 12px 4px rgba(0,0,0,.15);
+
+  /* --- shape scale (MD3 corner radii as a system) --- */
+  --shape-full:999px;      /* buttons · chips · segmented · nav indicator */
+  --shape-xl:28px;
+  --shape-lg:16px;         /* cards · fab */
+  --shape-md:12px;         /* list / media containers */
+  --shape-sm:8px;
+  --shape-xs:4px;
+
+  /* --- MD3 spacing grid (4dp base, 24dp layout gutter) --- */
+  --sp-4:4px; --sp-8:8px; --sp-12:12px; --sp-16:16px; --sp-24:24px; --sp-32:32px;
+
+  --motion-in:cubic-bezier(.2,0,0,1);
+  --motion-out:cubic-bezier(.4,0,.2,1);
+}
+/* MD3 type scale tokens — Roboto 不可用 → 系统栈，但字号/字重严格对齐 token */
+:root{
+  --font-sys:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",Roboto,sans-serif;
+  --ts-headline-sm:24px;   /* headlineSmall  24 / 400 */
+  --ts-headline-md:28px;   /* headlineMedium 28 / 400 */
+  --ts-title-lg:22px;      /* titleLarge     22 / 400 (app bar 品牌名) */
+  --ts-title-md:16px;      /* titleMedium    16 / 500 */
+  --ts-title-sm:14px;      /* titleSmall     14 / 500 */
+  --ts-body-lg:16px;       /* bodyLarge      16 / 400 */
+  --ts-body-md:14px;       /* bodyMedium     14 / 400 */
+  --ts-body-sm:12px;       /* bodySmall      12 / 400 */
+  --ts-label-lg:14px;      /* labelLarge     14 / 500 (按钮) */
+  --ts-label-md:12px;      /* labelMedium    12 / 500 */
+  --ts-label-sm:11px;      /* labelSmall     11 / 500 */
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;font-family:var(--font-sys);font-size:var(--ts-body-md);
+  line-height:1.5;color:var(--md-on-surface);background:var(--md-surface);
+  -webkit-font-smoothing:antialiased;display:flex;overflow:hidden;
+}
+h1,h2,h3,p,ul,ol,figure{margin:0;padding:0}
+ul,ol{list-style:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,textarea{font:inherit;color:inherit}
+a{color:var(--md-primary);text-decoration:none}
+:focus-visible{outline:2px solid var(--md-primary);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  .rp{display:none!important}
+}
+
+/* ==========================================================================
+   2. RIPPLE + STATE LAYER  (MD3 签名交互)
+   ========================================================================== */
+.ink{position:relative;overflow:hidden;isolation:isolate}
+.ink::after{ /* state layer: hover 8% primary overlay */
+  content:"";position:absolute;inset:0;background:var(--md-primary);
+  opacity:0;pointer-events:none;transition:opacity .15s var(--motion-out);z-index:0;
+}
+.ink:hover::after{opacity:.08}
+.ink:focus-visible::after{opacity:.12}
+.ink:active::after{opacity:.12}
+.ink > *{position:relative;z-index:1}
+.ink.is-on::after{opacity:.12}
+.rp{
+  position:absolute;border-radius:50%;transform:scale(0);pointer-events:none;z-index:0;
+  background:currentColor;opacity:.18;animation:rpgo .3s var(--motion-out) forwards;
+}
+@keyframes rpgo{to{transform:scale(1);opacity:0}}
+
+/* ==========================================================================
+   3. MD3 NAVIGATION RAIL (>=1024) / NAVIGATION BAR (<=767)
+   ========================================================================== */
+.rail{
+  width:88px;flex:0 0 88px;background:var(--md-surface-container);
+  display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:4px;
+  border-inline-end:1px solid var(--md-outline-variant);
+}
+.rail .rail-brand{width:56px;height:56px;border-radius:var(--shape-lg);display:grid;place-items:center;
+  background:var(--md-primary);color:var(--md-on-primary);margin-bottom:16px;box-shadow:var(--elev-1)}
+.nav-item{
+  width:64px;padding:10px 0 8px;border-radius:var(--shape-full);display:flex;flex-direction:column;
+  align-items:center;gap:4px;color:var(--md-on-surface-variant);
+  font-size:var(--ts-label-md);font-weight:500;letter-spacing:.3px;
+}
+.nav-item .icv{width:56px;height:32px;border-radius:var(--shape-full);display:grid;place-items:center;transition:background .2s var(--motion-out)}
+.nav-item[aria-current="page"]{color:var(--md-on-secondary-container)}
+.nav-item[aria-current="page"] .icv{background:var(--md-secondary-container)}
+.nav-item svg{width:24px;height:24px;flex:0 0 auto}
+.rail-sp{flex:1}
+
+/* ==========================================================================
+   4. TOP APP BAR (medium screen variant, elevation-3 tint)
+   ========================================================================== */
+.app{flex:1;display:flex;flex-direction:column;min-width:0}
+header.topbar{
+  background:var(--md-surface-container);padding:0 var(--sp-24);height:72px;flex:0 0 auto;
+  display:flex;align-items:center;gap:var(--sp-16);box-shadow:var(--elev-2);z-index:5;
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand .mark{width:40px;height:40px;border-radius:var(--shape-md);background:var(--md-primary-container);
+  color:var(--md-on-primary-container);display:grid;place-items:center;flex:0 0 auto}
+.brand h1{font-size:var(--ts-title-lg);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status{display:flex;align-items:center;gap:8px;font-size:var(--ts-body-sm);color:var(--md-on-surface-variant);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--md-success);box-shadow:0 0 0 4px var(--md-success-container);flex:0 0 auto}
+.tb-right{margin-inline-start:auto;display:flex;align-items:center;gap:var(--sp-12)}
+
+/* MD3 switch */
+.sw{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:var(--ts-body-sm);color:var(--md-on-surface-variant)}
+.sw input{position:absolute;opacity:0;width:0;height:0}
+.sw .track{width:52px;height:32px;border-radius:var(--shape-full);background:var(--md-surface-container-highest);
+  border:2px solid var(--md-outline);position:relative;transition:background .2s var(--motion-out),border-color .2s}
+.sw .thumb{position:absolute;top:50%;left:6px;width:16px;height:16px;border-radius:var(--shape-full);
+  background:var(--md-outline);transform:translateY(-50%);transition:.2s var(--motion-out)}
+.sw input:checked + .track{background:var(--md-primary);border-color:var(--md-primary)}
+.sw input:checked + .track .thumb{left:28px;width:24px;height:24px;background:var(--md-on-primary)}
+.sw input:focus-visible + .track{outline:2px solid var(--md-primary);outline-offset:2px}
+
+/* MD3 buttons — 全胶囊 */
+.btn{border-radius:var(--shape-full);padding:10px 24px;font-size:var(--ts-label-lg);font-weight:500;
+  display:inline-flex;align-items:center;gap:8px;min-height:40px;letter-spacing:.1px}
+.btn svg{width:18px;height:18px}
+.btn.filled{background:var(--md-primary);color:var(--md-on-primary)}
+.btn.tonal{background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.btn.outlined{border:1px solid var(--md-outline);color:var(--md-primary)}
+.btn.text{color:var(--md-primary);padding:10px 16px}
+.btn.icon{width:40px;height:40px;padding:0;justify-content:center;color:var(--md-on-surface-variant);
+  border:1px solid var(--md-outline-variant)}
+.btn[disabled]{color:rgba(28,27,31,.38);background:rgba(28,27,31,.12);pointer-events:none;border-color:transparent}
+
+/* ==========================================================================
+   5. SEGMENTED BUTTON (MD3 模块切换 · 签名组件)
+   ========================================================================== */
+main.body{flex:1;display:flex;flex-direction:column;min-height:0;padding:var(--sp-16) var(--sp-24) 0}
+.seg-head{display:flex;align-items:center;gap:var(--sp-16);flex-wrap:wrap;margin-bottom:var(--sp-16)}
+.seg-title{font-size:var(--ts-headline-sm);font-weight:400;line-height:1.25}
+.seg{display:inline-flex;border:1px solid var(--md-outline);border-radius:var(--shape-full);overflow:hidden;
+  background:var(--md-surface)}
+.seg .sg{padding:10px 20px;font-size:var(--ts-label-lg);font-weight:500;color:var(--md-on-surface-variant);
+  display:inline-flex;align-items:center;gap:8px;border-inline-start:1px solid var(--md-outline)}
+.seg .sg:first-child{border-inline-start:0}
+.seg .sg svg{width:18px;height:18px}
+.seg .sg[aria-selected="true"]{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.seg .sg[aria-selected="true"] svg{display:inline}
+.seg .sg .chk{display:none}
+.seg .sg[aria-selected="true"] .chk{display:inline}
+
+.stage{flex:1;min-height:0;position:relative}
+.pane{position:absolute;inset:0;display:none;overflow:auto;padding-bottom:var(--sp-24);
+  scrollbar-width:thin;scroll-behavior:smooth}
+.pane.active{display:block}
+
+/* ==========================================================================
+   6. CHAT MODULE
+   ========================================================================== */
+.msgs{max-width:920px;margin:0 auto;display:flex;flex-direction:column;gap:var(--sp-24)}
+.welcome{background:var(--md-primary-container);border-radius:var(--shape-lg);padding:var(--sp-16) var(--sp-24);
+  color:var(--md-on-primary-container)}
+.welcome p{font-size:var(--ts-body-lg)}
+.welcome .hint{margin-top:8px;font-size:var(--ts-body-sm);opacity:.85}
+.welcome .hint code{background:rgba(33,0,93,.10);padding:2px 8px;border-radius:var(--shape-sm);font-family:inherit}
+
+.row{display:flex;gap:var(--sp-12)}
+.row.user{justify-content:flex-end}
+.bubble-u{background:var(--md-primary);color:var(--md-on-primary);border-radius:var(--shape-lg) var(--shape-lg) var(--shape-sm) var(--shape-lg);
+  padding:12px 16px;max-width:70%;font-size:var(--ts-body-lg)}
+.time{font-size:var(--ts-label-sm);color:var(--md-on-surface-variant);align-self:flex-end;white-space:nowrap}
+.avatar{width:36px;height:36px;border-radius:var(--shape-full);background:var(--md-tertiary-container);
+  color:var(--md-on-tertiary-container);display:grid;place-items:center;flex:0 0 auto;font-size:var(--ts-label-md);font-weight:500}
+.bot{flex:1;min-width:0}
+.bot .who{font-size:var(--ts-title-sm);font-weight:500;margin-bottom:6px;color:var(--md-on-surface-variant)}
+.card{background:var(--md-surface-container-low);border-radius:var(--shape-lg);padding:var(--sp-16);box-shadow:var(--elev-1)}
+.card.e2{background:var(--md-surface-container);box-shadow:var(--elev-2)}
+.answer{font-size:var(--ts-body-lg)}
+.answer .lead{margin-bottom:8px}
+.answer b{font-weight:500;color:var(--md-primary)}
+.answer ol{margin:8px 0 0;display:flex;flex-direction:column;gap:6px;padding-inline-start:18px;list-style:decimal}
+/* 引用角标：小圆角 sup chip */
+.cite{display:inline-flex;min-width:20px;height:20px;padding:0 6px;align-items:center;justify-content:center;
+  vertical-align:super;font-size:var(--ts-label-sm);font-weight:500;border-radius:var(--shape-xs);
+  background:var(--md-tertiary-container);color:var(--md-on-tertiary-container);margin-inline-start:2px;
+  transition:background .15s var(--motion-out)}
+.cite:hover{background:var(--md-primary-container)}
+.cite.flash{background:var(--md-primary);color:var(--md-on-primary)}
+
+.sec-h{display:flex;align-items:center;gap:8px;font-size:var(--ts-title-md);font-weight:500;margin:var(--sp-16) 0 var(--sp-12)}
+.sec-h svg{width:20px;height:20px;color:var(--md-primary)}
+
+/* 参考来源列表 */
+.src{display:flex;flex-direction:column;gap:var(--sp-8)}
+.src li{background:var(--md-surface-container-lowest);border:1px solid var(--md-outline-variant);
+  border-radius:var(--shape-md);padding:10px 12px;display:flex;gap:12px;align-items:flex-start;
+  font-size:var(--ts-body-md);transition:background .2s var(--motion-out),border-color .2s}
+.src li.hl{background:var(--md-primary-container);border-color:var(--md-primary)}
+.src .no{font-family:ui-monospace,Consolas,monospace;font-size:var(--ts-label-md);color:var(--md-primary);
+  font-weight:500;background:var(--md-secondary-container);border-radius:var(--shape-sm);padding:2px 6px;flex:0 0 auto}
+.src .txt{min-width:0;flex:1}
+.src .ti{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src .meta{display:block;font-size:var(--ts-body-sm);color:var(--md-on-surface-variant);
+  overflow-wrap:anywhere;margin-top:2px}
+.src .rel{font-size:var(--ts-label-sm);color:var(--md-on-surface-variant);white-space:nowrap;align-self:center}
+/* MD3 chips：assist / filter 两类 */
+.tag{border-radius:var(--shape-full);padding:3px 12px;font-size:var(--ts-label-md);font-weight:500;
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.tag.kb{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.tag.web{background:transparent;color:var(--md-primary);border:1px solid var(--md-outline)}
+.tag.sq{background:var(--md-tertiary-container);color:var(--md-on-tertiary-container)}
+.tag.sq::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.tag[data-toggle]{border:1px solid var(--md-outline);color:var(--md-on-surface-variant);padding:7px 16px;font-size:var(--ts-label-lg)}
+.tag[data-toggle][aria-pressed="true"]{background:var(--md-secondary-container);color:var(--md-on-secondary-container);border-color:transparent}
+/* filter chip 勾选态：出现 MD3 勾选图标 */
+.tag[data-toggle][aria-pressed="true"]::before{content:"";width:18px;height:18px;margin-inline-start:-4px;
+  background:no-repeat center/contain url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%231D192B"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>')}
+
+/* 引用图片区：4 张内联 SVG 占位缩略图 */
+.shots{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-12)}
+.shot{background:var(--md-surface-container-lowest);border-radius:var(--shape-md);padding:8px;
+  border:1px solid var(--md-outline-variant);display:flex;flex-direction:column;gap:6px}
+.shot svg{width:100%;height:84px;display:block;border-radius:var(--shape-sm);background:var(--md-surface-container)}
+.shot span{font-size:var(--ts-label-sm);color:var(--md-on-surface-variant);text-align:center}
+
+/* MD3 expand container：阶段进度折叠面板 */
+.exp{border-radius:var(--shape-lg);background:var(--md-surface-container);overflow:hidden;
+  border:1px solid var(--md-outline-variant)}
+.exp > .hd{display:flex;align-items:center;gap:12px;padding:12px var(--sp-16);width:100%;text-align:start}
+.exp .hd .t{font-size:var(--ts-title-md);font-weight:500;flex:1;min-width:0}
+.exp .hd .sub{font-size:var(--ts-body-sm);color:var(--md-on-surface-variant);font-weight:400;display:block}
+.exp .hd .arw{width:24px;height:24px;flex:0 0 auto;transition:transform .25s var(--motion-out);color:var(--md-on-surface-variant)}
+.exp[data-open="true"] .arw{transform:rotate(180deg)}
+.exp .bd{max-height:0;overflow:hidden;transition:max-height .35s var(--motion-out)}
+.exp[data-open="true"] .bd{max-height:520px}
+.exp.panel{padding:0}                       /* MD3 expand container 与 panel 复用时不双重内边距 */
+.exp .inner{padding:0 var(--sp-16) var(--sp-16)}
+.steps{display:flex;flex-direction:column;gap:2px}
+.steps li{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:var(--shape-sm);font-size:var(--ts-body-md)}
+.steps li:hover{background:rgba(103,80,164,.08)}
+.steps .ok{width:20px;height:20px;flex:0 0 auto;color:var(--md-success)}
+.steps .dur{margin-inline-start:auto;font-size:var(--ts-body-sm);color:var(--md-on-surface-variant);font-family:ui-monospace,Consolas,monospace}
+.ask{background:var(--md-surface-container-high);border-radius:var(--shape-md);padding:12px var(--sp-16);font-size:var(--ts-body-md)}
+.chips-row{display:flex;flex-wrap:wrap;gap:var(--sp-8);margin-top:var(--sp-12)}
+
+/* composer：MD3 outlined text field + label 浮动 notch */
+.composer{flex:0 0 auto;background:var(--md-surface);padding:var(--sp-12) var(--sp-24) var(--sp-16);
+  border-block-start:1px solid var(--md-outline-variant)}
+.composer-in{max-width:920px;margin:0 auto}
+.field{position:relative;display:block}
+.field textarea,.field input{
+  width:100%;display:block;background:var(--md-surface);border:1px solid var(--md-outline);
+  border-radius:var(--shape-sm);padding:16px var(--sp-16);font-size:var(--ts-body-lg);min-height:56px;
+  resize:none;transition:border-color .15s var(--motion-out),box-shadow .15s;
+}
+.field textarea{max-height:140px;overflow:auto}
+.field .lb{position:absolute;left:12px;top:16px;padding:0 4px;font-size:var(--ts-body-lg);
+  color:var(--md-on-surface-variant);background:var(--md-surface);pointer-events:none;
+  transition:.15s var(--motion-out);max-width:calc(100% - 24px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.field:focus-within textarea,.field:focus-within input{border-width:2px;outline:none}
+.field.floated .lb,.field:focus-within .lb{
+  /* label 上浮到描边 = MD3 notch 效果 */
+  top:-9px;font-size:var(--ts-label-sm);color:var(--md-primary);line-height:18px}
+.field .supp{font-size:var(--ts-label-sm);color:var(--md-on-surface-variant);padding:4px 12px 0;display:block}
+.c-row{display:flex;align-items:flex-end;gap:var(--sp-12);margin-top:var(--sp-12)}
+.kbd{display:flex;gap:var(--sp-8);font-size:var(--ts-label-sm);color:var(--md-on-surface-variant);align-items:center}
+.kbd b{font-weight:500;border:1px solid var(--md-outline-variant);background:var(--md-surface-container-low);
+  border-radius:var(--shape-xs);padding:2px 8px}
+/* MD3 Fab 16px 形状 */
+.fab{width:56px;height:56px;border-radius:var(--shape-lg);background:var(--md-primary);color:var(--md-on-primary);
+  display:grid;place-items:center;box-shadow:var(--elev-3);flex:0 0 auto}
+.fab svg{width:24px;height:24px}
+.fab[disabled]{background:rgba(28,27,31,.12);color:rgba(28,27,31,.38);box-shadow:none}
+
+/* MD3 线性进度指示器 */
+.lin{height:4px;border-radius:var(--shape-full);background:var(--md-primary-container);overflow:hidden;position:relative}
+.lin i{position:absolute;inset:0 auto 0 0;width:40%;background:var(--md-primary);border-radius:inherit;
+  animation:sweep 1.4s var(--motion-out) infinite}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+.lin.det i{animation:none;width:var(--v,0%);transition:width .3s var(--motion-out)}
+
+/* ==========================================================================
+   7. IMPORT MODULE
+   ========================================================================== */
+.imp-wrap{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
+  gap:var(--sp-24);align-items:start}
+.drop{border:2px dashed var(--md-outline);border-radius:var(--shape-lg);background:var(--md-surface-container-low);
+  padding:var(--sp-32) var(--sp-24);text-align:center;color:var(--md-on-surface-variant);width:100%;
+  display:flex;flex-direction:column;align-items:center;gap:var(--sp-8);
+  transition:background .2s var(--motion-out),border-color .2s}
+.drop:hover,.drop.over{background:var(--md-secondary-container);border-color:var(--md-primary);color:var(--md-on-secondary-container)}
+.drop svg{width:40px;height:40px}
+.drop .t{font-size:var(--ts-title-md);font-weight:500;color:var(--md-on-surface)}
+.drop .s{font-size:var(--ts-body-sm)}
+.panel{background:var(--md-surface-container-low);border-radius:var(--shape-lg);padding:var(--sp-16);box-shadow:var(--elev-1)}
+.panel + .panel{margin-top:var(--sp-24)}
+.files{display:flex;flex-direction:column;gap:var(--sp-12);margin-top:var(--sp-12)}
+.f{background:var(--md-surface-container-lowest);border:1px solid var(--md-outline-variant);
+  border-radius:var(--shape-md);padding:var(--sp-12) var(--sp-16);display:flex;flex-direction:column;gap:10px}
+.f-top{display:flex;align-items:center;gap:12px}
+.f-ic{width:40px;height:40px;border-radius:var(--shape-sm);display:grid;place-items:center;flex:0 0 auto;
+  background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.f.err .f-ic{background:var(--md-error-container);color:var(--md-on-error-container)}
+.f.doing .f-ic{background:var(--md-tertiary-container);color:var(--md-on-tertiary-container)}
+.f-ic svg{width:22px;height:22px}
+.f-nm{min-width:0;flex:1}
+.f-nm .n{font-size:var(--ts-title-sm);font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f-nm .sz{font-size:var(--ts-body-sm);color:var(--md-on-surface-variant)}
+.badge{border-radius:var(--shape-full);padding:4px 12px;font-size:var(--ts-label-md);font-weight:500;white-space:nowrap}
+.badge.done{background:var(--md-success-container);color:#1B4632}
+.badge.up{background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.badge.proc{background:var(--md-tertiary-container);color:var(--md-on-tertiary-container)}
+.badge.fail{background:var(--md-error-container);color:var(--md-on-error-container)}
+.f-mid{font-size:var(--ts-body-sm);color:var(--md-on-surface-variant);display:flex;gap:var(--sp-16);flex-wrap:wrap;align-items:center}
+.f-links{display:flex;gap:var(--sp-12);flex-wrap:wrap}
+.link-btn{border-radius:var(--shape-full);padding:6px 16px;font-size:var(--ts-label-lg);font-weight:500;
+  color:var(--md-primary);border:1px solid var(--md-outline)}
+.err-txt{background:var(--md-error-container);color:var(--md-on-error-container);border-radius:var(--shape-sm);
+  padding:10px 12px;font-size:var(--ts-body-md);display:flex;gap:10px;align-items:flex-start}
+.err-txt svg{width:20px;height:20px;flex:0 0 auto}
+.logs li{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:var(--shape-sm);font-size:var(--ts-body-md)}
+.logs li:hover{background:rgba(103,80,164,.08)}
+.logs .st{width:18px;height:18px;flex:0 0 auto}
+.logs .dur{margin-inline-start:auto;font-family:ui-monospace,Consolas,monospace;font-size:var(--ts-body-sm);color:var(--md-on-surface-variant)}
+.note{margin-top:var(--sp-16);font-size:var(--ts-body-sm);color:var(--md-on-surface-variant);
+  background:var(--md-surface-container);border-radius:var(--shape-md);padding:10px var(--sp-16);display:flex;gap:8px;align-items:center}
+.note code{font-family:ui-monospace,Consolas,monospace;color:var(--md-primary);overflow-wrap:anywhere}
+.side .kv{display:flex;flex-direction:column;gap:10px;margin-top:var(--sp-12)}
+.side .kv div{display:flex;justify-content:space-between;gap:12px;font-size:var(--ts-body-md)}
+.side .kv b{font-weight:500;color:var(--md-on-surface-variant)}
+
+/* MD3 snackbar */
+.snack{position:fixed;bottom:24px;left:50%;transform:translate(-50%,140%);z-index:60;
+  background:var(--md-inverse-surface);color:var(--md-inverse-on-surface);border-radius:var(--shape-sm);
+  padding:14px 16px;box-shadow:var(--elev-3);display:flex;align-items:center;gap:var(--sp-16);
+  font-size:var(--ts-body-md);max-width:min(560px,92vw);transition:transform .28s var(--motion-out)}
+.snack.up{transform:translate(-50%,0)}
+.snack button{color:var(--md-inverse-primary);border-radius:var(--shape-full);padding:6px 12px;font-size:var(--ts-label-lg);font-weight:500}
+
+/* 底部 navigation bar (MD3, <=767) */
+.navbar{display:none;flex:0 0 auto;background:var(--md-surface-container);border-block-start:1px solid var(--md-outline-variant);
+  padding:8px 0 max(8px,env(safe-area-inset-bottom))}
+.navbar .nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0;
+  font-size:var(--ts-label-sm);color:var(--md-on-surface-variant)}
+.navbar .icv{width:64px;height:32px;border-radius:var(--shape-full);display:grid;place-items:center}
+.navbar .nb[aria-current="page"]{color:var(--md-on-secondary-container)}
+.navbar .nb[aria-current="page"] .icv{background:var(--md-secondary-container)}
+.navbar svg{width:24px;height:24px}
+
+/* ==========================================================================
+   8. RESPONSIVE  1440 / 1024 / 768 / 390
+   ========================================================================== */
+@media (max-width:1180px){ .imp-wrap{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:1023px){                       /* rail 收起 → 顶部标签仍可切换 */
+  .rail{width:72px;flex-basis:72px}
+  main.body{padding:var(--sp-12) var(--sp-16) 0}
+  .composer{padding:var(--sp-12) var(--sp-16) var(--sp-16)}
+  header.topbar{padding:0 var(--sp-16)}
+}
+@media (max-width:767px){
+  .rail{display:none}
+  .navbar{display:flex}
+  header.topbar{height:64px;gap:var(--sp-8)}
+  .brand h1{font-size:var(--ts-title-md)}
+  .status span{display:none}
+  .shots{grid-template-columns:repeat(2,1fr)}
+  .bubble-u{max-width:84%}
+  .seg-head{gap:var(--sp-8)}
+  .seg .sg{padding:10px 14px}
+}
+@media (max-width:390px){
+  header.topbar{padding:0 12px;gap:var(--sp-8)}
+  .brand .mark{display:none}
+  .brand h1{font-size:var(--ts-title-sm)}
+  .sw .txt{display:none}                     /* 390 只保留 MD3 switch 轨道 */
+  main.body{padding:12px 12px 0}
+  .composer{padding:12px 12px 16px}
+  .tb-right{gap:var(--sp-8)}
+  .tb-right .btn.text span{display:none}
+  .tb-right .btn.text{padding:10px;width:40px;height:40px;justify-content:center}
+  .kbd{display:none}
+  .src .rel{display:none}
+  .f-top{flex-wrap:wrap}
+  .panel{padding:12px}
+  .drop{padding:24px 16px}
+  .seg-title{font-size:var(--ts-title-md)}
+}
+</style>
+</head>
+<body>
+
+<!-- ==================== MD3 NAVIGATION RAIL (elevation 0 · surface container) ==================== -->
+<nav class="rail" aria-label="主导航">
+  <div class="rail-brand" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M12 3 2 8l10 5 10-5-10-5Zm0 9.2L4.6 8.8 12 5.4l7.4 3.4L12 12.2ZM4 12.6l2 1.1 6 3.4 6-3.4 2-1.1V17l-8 4.5L4 17v-4.4Z"/></svg>
+  </div>
+  <button class="nav-item ink" data-go="chat" aria-current="page">
+    <span class="icv"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2Zm0 14H5.2L4 17.2V4h16v12Z"/></svg></span>
+    <span>检索问答</span>
+  </button>
+  <button class="nav-item ink" data-go="import">
+    <span class="icv"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96ZM14 13v4h-4v-4H7l5-5 5 5h-3Z"/></svg></span>
+    <span>文档导入</span>
+  </button>
+  <button class="nav-item ink" data-noop>
+    <span class="icv"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98c.04-.32.07-.66.07-1s-.03-.68-.07-1l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1a7.3 7.3 0 0 0-1.73-1l-.38-2.65A.49.49 0 0 0 13.96 2h-4a.49.49 0 0 0-.49.42l-.38 2.65c-.63.25-1.21.6-1.73 1l-2.49-1a.5.5 0 0 0-.61.22l-2 3.46c-.13.22-.06.49.12.64l2.11 1.65c-.04.32-.07.66-.07 1s.03.68.07 1l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.1.75 1.73 1l.38 2.65c.04.24.24.42.49.42h4c.25 0 .45-.18.49-.42l.38-2.65c.63-.25 1.21-.6 1.73-1l2.49 1c.22.08.49 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg></span>
+    <span>系统设置</span>
+  </button>
+  <div class="rail-sp"></div>
+  <button class="nav-item ink" data-noop>
+    <span class="icv"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z"/></svg></span>
+    <span>账号</span>
+  </button>
+</nav>
+
+<div class="app">
+  <!-- ==================== TOP APP BAR ==================== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 3 2 8l10 5 10-5-10-5Zm0 9.2L4.6 8.8 12 5.4l7.4 3.4L12 12.2ZM4 12.6l2 1.1 6 3.4 6-3.4 2-1.1V17l-8 4.5L4 17v-4.4Z"/></svg>
+      </span>
+      <h1>BOSS智库知识库</h1>
+    </div>
+    <div class="status"><span class="dot" aria-hidden="true"></span><span>在线 · 可查询知识库与联网信息</span></div>
+    <div class="tb-right">
+      <label class="sw">
+        <input type="checkbox" id="streamSw" checked>
+        <span class="track"><span class="thumb"></span></span>
+        <span class="txt">流式输出</span>
+      </label>
+      <button class="btn text ink" id="clearBtn">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 9H6a1 1 0 0 0-1 1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V10a1 1 0 0 0-1-1Z"/></svg>
+        <span>清空对话</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== BODY ==================== -->
+  <main class="body">
+    <div class="seg-head">
+      <h2 class="seg-title" id="viewTitle">知识检索问答</h2>
+      <div class="seg" role="tablist" aria-label="模块切换">
+        <button class="sg ink" role="tab" id="tab-chat" aria-selected="true" aria-controls="pane-chat" data-go="chat">
+          <svg class="chk" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2Z"/></svg>
+          检索 Chat
+        </button>
+        <button class="sg ink" role="tab" id="tab-import" aria-selected="false" aria-controls="pane-import" data-go="import">
+          <svg class="chk" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96ZM14 13v4h-4v-4H7l5-5 5 5h-3Z"/></svg>
+          文档导入
+        </button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <!-- ==================== PANE · CHAT ==================== -->
+      <section class="pane active" id="pane-chat" role="tabpanel" aria-labelledby="tab-chat">
+        <div class="msgs" id="msgs">
+          <div class="welcome">
+            <p>你好，我是BOSS智库知识库客服。你可以直接提问，我会在“阶段进度”里展示处理过程。</p>
+            <p class="hint">可以问 <code>如何使用万用表测量电压？</code></p>
+          </div>
+
+          <div class="row user">
+            <div class="bubble-u">Coze 商家客服初级这个案例里，意图识别节点后面分了几条支路？</div>
+            <span class="time">20:23</span>
+          </div>
+
+          <div class="row">
+            <span class="avatar" aria-hidden="true">智</span>
+            <div class="bot">
+              <div class="who">BOSS智库 · 20:23</div>
+              <div class="card e2">
+                <div class="answer" id="answerBody">
+                  <p class="lead">在《Coze 工作流实战：商家客服初级》案例中，意图识别节点后面一共分了 <b>3 条支路</b>：售前、售后、兜底。<span class="cite ink" role="button" tabindex="0" data-cite="2">2</span></p>
+                  <ol>
+                    <li>售前支路：对应意图 <code>branch_0</code>，处理商品、活动、发货咨询，含商品查询（循环校验）与优惠咨询；<span class="cite ink" role="button" tabindex="0" data-cite="3">3</span></li>
+                    <li>售后支路：对应意图 <code>branch_1</code>，处理退换货、质量纠纷、退款；<span class="cite ink" role="button" tabindex="0" data-cite="5">5</span></li>
+                    <li>兜底支路：对应 <code>default</code>，无法匹配时进入大模型陪聊并挂载插件。<span class="cite ink" role="button" tabindex="0" data-cite="7">7</span></li>
+                  </ol>
+                </div>
+
+                <!-- 参考来源（8） -->
+                <h3 class="sec-h">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Zm0 16H6V4h2v6l2.5-1.5L13 10V4h5v14Z"/></svg>
+                  参考来源（8）
+                </h3>
+                <ul class="src" id="srcList">
+                  <li id="src-1"><span class="no">[1]</span><span class="txt"><span class="ti">《Coze 工作流实战：商家客服初级》第 3 章 · 意图识别分支设计</span><span class="meta">知识库 · chunk_id=kb_0417_003</span></span><span class="tag kb">知识库</span><span class="rel">相关度 0.9612</span></li>
+                  <li id="src-2"><span class="no">[2]</span><span class="txt"><span class="ti">商家客服初级 · 售前支路商品查询循环校验说明</span><span class="meta">知识库 · chunk_id=kb_0417_011</span></span><span class="tag kb">知识库</span><span class="rel">相关度 0.9487</span></li>
+                  <li id="src-3"><span class="no">[3]</span><span class="txt"><span class="ti">Hak180 产品手册 · 售前活动与优惠咨询话术</span><span class="meta">知识库 · chunk_id=kb_0088_021</span></span><span class="tag kb">知识库</span><span class="rel">相关度 0.9342</span></li>
+                  <li id="src-4"><span class="no">[4]</span><span class="txt"><span class="ti">HAK180 常见问题 · 兜底大模型陪聊与插件挂载</span><span class="meta">知识库 · chunk_id=kb_0091_007</span></span><span class="tag kb">知识库</span><span class="rel">相关度 0.9118</span></li>
+                  <li id="src-5"><span class="no">[5]</span><span class="txt"><span class="ti">Coze 工作流从入门到精通系列3：看工作流如何玩转内容创作与智能客服 - 火山引擎</span><span class="meta">联网 · https://www.volcengine.com/article/coze-workflow-3</span></span><span class="tag web">联网</span><span class="rel">相关度 0.8975</span></li>
+                  <li id="src-6"><span class="no">[6]</span><span class="txt"><span class="ti">Coze工作流实战：快速搭建网站的智能客服助手 - 博客园</span><span class="meta">联网 · https://www.cnblogs.com/coze-cs-demo</span></span><span class="tag web">联网</span><span class="rel">相关度 0.8851</span></li>
+                  <li id="src-7"><span class="no">[7]</span><span class="txt"><span class="ti">探秘 AI Agent 之 Coze 智能体：工作流模式 - 腾讯云开发者社区</span><span class="meta">联网 · https://developer.cloud.tencent.com/article/agent-coze</span></span><span class="tag web">联网</span><span class="rel">相关度 0.8634</span></li>
+                  <li id="src-8"><span class="no">[8]</span><span class="txt"><span class="ti">零基础Coze与Dify教程，Agent智能体项目实战 - bilibili</span><span class="meta">联网 · https://www.bilibili.com/video/coze-dify-agent</span></span><span class="tag web">联网</span><span class="rel">相关度 0.8412</span></li>
+                </ul>
+                <div class="chips-row" id="srcFilter">
+                  <button class="tag sq ink" data-toggle aria-pressed="true">仅看知识库</button>
+                  <button class="tag sq ink" data-toggle aria-pressed="false">仅看联网</button>
+                </div>
+
+                <!-- 引用图片区：4 张内联 SVG 占位 -->
+                <h3 class="sec-h">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2ZM8.5 11a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm11 6.5-3-4-2.5 3.5-2-2.5L5 19h14.5Z"/></svg>
+                  引用图片（4）
+                </h3>
+                <div class="shots">
+                  <figure class="shot"><svg viewBox="0 0 160 84" role="img" aria-label="参考图片 1：工作流画布截图"><rect width="160" height="84" fill="#EADDFF"/><rect x="12" y="16" width="40" height="20" rx="6" fill="#6750A4"/><rect x="60" y="10" width="42" height="18" rx="6" fill="#E8DEF8"/><rect x="60" y="34" width="42" height="18" rx="6" fill="#E8DEF8"/><rect x="60" y="58" width="42" height="18" rx="6" fill="#E8DEF8"/><path d="M52 26h8M52 43h8" stroke="#79747E" stroke-width="2"/></svg><span>参考图片 1 · 工作流画布</span></figure>
+                  <figure class="shot"><svg viewBox="0 0 160 84" role="img" aria-label="参考图片 2：意图识别节点配置"><rect width="160" height="84" fill="#E8DEF8"/><rect x="14" y="12" width="60" height="24" rx="6" fill="#6750A4"/><rect x="86" y="12" width="60" height="10" rx="5" fill="#FFFFFF"/><rect x="86" y="26" width="46" height="10" rx="5" fill="#FFFFFF"/><rect x="14" y="48" width="132" height="10" rx="5" fill="#FFD8E4"/><rect x="14" y="64" width="90" height="10" rx="5" fill="#FFD8E4"/></svg><span>参考图片 2 · 节点配置</span></figure>
+                  <figure class="shot"><svg viewBox="0 0 160 84" role="img" aria-label="参考图片 3：三条支路连线图"><rect width="160" height="84" fill="#F3EDF7"/><circle cx="30" cy="42" r="14" fill="#6750A4"/><circle cx="126" cy="18" r="10" fill="#EADDFF"/><circle cx="126" cy="42" r="10" fill="#EADDFF"/><circle cx="126" cy="66" r="10" fill="#EADDFF"/><path d="M44 40 116 20M44 42h72M44 44 116 64" stroke="#6750A4" stroke-width="2" fill="none"/></svg><span>参考图片 3 · 支路连线</span></figure>
+                  <figure class="shot"><svg viewBox="0 0 160 84" role="img" aria-label="参考图片 4：售后分支调试日志"><rect width="160" height="84" fill="#E6E0E9"/><rect x="10" y="10" width="140" height="12" rx="4" fill="#FFFFFF"/><rect x="10" y="28" width="110" height="12" rx="4" fill="#FFFFFF"/><rect x="10" y="46" width="128" height="12" rx="4" fill="#EADDFF"/><rect x="10" y="64" width="76" height="12" rx="4" fill="#FFFFFF"/></svg><span>参考图片 4 · 调试日志</span></figure>
+                </div>
+              </div>
+
+              <!-- 阶段进度折叠面板 (MD3 expand container) -->
+              <div class="exp" data-open="false" style="margin-top:16px">
+                <button class="hd ink" aria-expanded="false" aria-controls="expProg">
+                  <span class="t">阶段进度（已完成7，进行中0，状态：已完成）<span class="sub">检索链路 7 个节点 · 总耗时 12.4s</span></span>
+                  <svg class="arw" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z"/></svg>
+                </button>
+                <div class="bd"><div class="inner" id="expProg">
+                  <ul class="steps">
+                    <li><svg class="ok" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/></svg>确认问题产品<span class="dur">0.62s</span></li>
+                    <li><svg class="ok" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/></svg>切片搜索<span class="dur">1.18s</span></li>
+                    <li><svg class="ok" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/></svg>切片搜索(假设性文档)<span class="dur">2.05s</span></li>
+                    <li><svg class="ok" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/></svg>网络搜索<span class="dur">3.41s</span></li>
+                    <li><svg class="ok" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/></svg>倒排融合<span class="dur">0.87s</span></li>
+                    <li><svg class="ok" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/></svg>重排序<span class="dur">1.63s</span></li>
+                    <li><svg class="ok" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/></svg>生成答案<span class="dur">2.64s</span></li>
+                  </ul>
+                </div></div>
+              </div>
+
+              <!-- 追问示例 + 型号候选 chips -->
+              <div class="exp" data-open="true" style="margin-top:16px">
+                <button class="hd ink" aria-expanded="true" aria-controls="expAsk">
+                  <span class="t">需要澄清一下问题<span class="sub">检测到多个相似主体名称</span></span>
+                  <svg class="arw" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z"/></svg>
+                </button>
+                <div class="bd"><div class="inner" id="expAsk">
+                  <p class="ask">您是想问以下哪个产品：HAK180、Hak180、Coze 工作流实战:商家客服初级？请明确一下型号。</p>
+                  <div class="chips-row" id="candChips">
+                    <button class="tag sq ink" data-toggle aria-pressed="false">HAK180</button>
+                    <button class="tag sq ink" data-toggle aria-pressed="false">Hak180</button>
+                    <button class="tag sq ink" data-toggle aria-pressed="true">Coze 工作流实战:商家客服初级</button>
+                  </div>
+                </div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== PANE · IMPORT ==================== -->
+      <section class="pane" id="pane-import" role="tabpanel" aria-labelledby="tab-import">
+        <div class="imp-wrap">
+          <div>
+            <button class="drop ink" id="drop" aria-label="点击或拖拽 PDF / Markdown 文件到此处上传">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96ZM14 13v4h-4v-4H7l5-5 5 5h-3Z"/></svg>
+              <span class="t">点击或拖拽文件到此处 (PDF/MD)</span>
+              <span class="s">支持批量 · 单文件建议 ≤ 50 MB · 解析后自动切片入库</span>
+              <span class="lin" id="upLin" style="width:100%;display:none"><i></i></span>
+            </button>
+
+            <div class="panel" style="margin-top:16px">
+              <h3 class="sec-h" style="margin-top:0">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm4 18H6V4h7v5h5v11Z"/></svg>
+                文件列表（4）
+              </h3>
+              <ul class="files">
+                <li class="f ink">
+                  <div class="f-top">
+                    <span class="f-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 7V3.5L18.5 9H13Z"/></svg></span>
+                    <span class="f-nm"><span class="n">03-商家客服初级.pdf</span><span class="sz">1.7 MB · PDF</span></span>
+                    <span class="badge done">已完成</span>
+                  </div>
+                  <div class="lin det" style="--v:100%"><i></i></div>
+                  <div class="f-mid"><span>进度 100%</span><span>切片数：17</span><span>入库时间 08:42</span></div>
+                  <div class="f-links">
+                    <button class="link-btn ink">查看Markdown</button>
+                    <button class="link-btn ink">下载Markdown</button>
+                  </div>
+                </li>
+                <li class="f ink">
+                  <div class="f-top">
+                    <span class="f-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 7V3.5L18.5 9H13Z"/></svg></span>
+                    <span class="f-nm"><span class="n">sample.pdf</span><span class="sz">0.7 KB · PDF</span></span>
+                    <span class="badge done">已完成</span>
+                  </div>
+                  <div class="lin det" style="--v:100%"><i></i></div>
+                  <div class="f-mid"><span>进度 100%</span><span>切片数：1</span><span>入库时间 08:44</span></div>
+                  <div class="f-links">
+                    <button class="link-btn ink">查看Markdown</button>
+                    <button class="link-btn ink">下载Markdown</button>
+                  </div>
+                </li>
+                <li class="f doing ink">
+                  <div class="f-top">
+                    <span class="f-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 7V3.5L18.5 9H13Z"/></svg></span>
+                    <span class="f-nm"><span class="n">04-万用表操作手册.pdf</span><span class="sz">3.4 MB · PDF</span></span>
+                    <span class="badge proc">处理中</span>
+                  </div>
+                  <div class="lin"><i></i></div>
+                  <div class="f-mid"><span id="procStage">向量生成 62%</span><span>切片数：计算中</span></div>
+                </li>
+                <li class="f err ink">
+                  <div class="f-top">
+                    <span class="f-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21Zm12-3h-2v-2h2v2Zm0-4h-2v-4h2v4Z"/></svg></span>
+                    <span class="f-nm"><span class="n">损坏文件.pdf</span><span class="sz">2.3 MB · PDF</span></span>
+                    <span class="badge fail">失败</span>
+                  </div>
+                  <div class="f-mid"><span>进度 停止于 18%</span></div>
+                  <p class="err-txt">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+                    PDF 加密或无法解析，已中止导入
+                  </p>
+                  <div class="f-links">
+                    <button class="link-btn ink" id="retryBtn">重新上传</button>
+                    <button class="link-btn ink" id="detailBtn">查看错误详情</button>
+                  </div>
+                </li>
+              </ul>
+              <p class="note">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M11 7h2v2h-2V7Zm0 4h2v6h-2v-6ZM12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/></svg>
+                后端接口地址：<code>http://127.0.0.1:8000</code>
+              </p>
+            </div>
+          </div>
+
+          <aside class="side">
+            <div class="panel" style="margin-top:0">
+              <h3 class="sec-h" style="margin-top:0">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h4v-2H3v2Zm0 4h4v-2H3v2Zm0-8h4V7H3v2Zm10 4h8v-2h-8v2Zm0 4h8v-2h-8v2Zm0-8h8V7h-8v2Z"/></svg>
+                上传队列
+              </h3>
+              <div class="kv">
+                <div><b>队列中 / 上传中</b><span><span class="badge up">上传中</span> 34%</span></div>
+                <div><b>处理中</b><span>1</span></div>
+                <div><b>已完成</b><span>2</span></div>
+                <div><b>失败</b><span>1</span></div>
+                <div><b>今日累计切片</b><span>192</span></div>
+              </div>
+              <div class="chips-row">
+                <button class="tag sq ink" data-toggle aria-pressed="true">自动重试</button>
+                <button class="tag sq ink" data-toggle aria-pressed="false">仅看我上传的</button>
+              </div>
+            </div>
+
+            <div class="exp panel" data-open="true" style="border:0;box-shadow:var(--elev-1);background:var(--md-surface-container-low)">
+              <button class="hd ink" aria-expanded="true" aria-controls="nodeLog">
+                <span class="t">节点执行日志<span class="sub">03-商家客服初级.pdf · 8 个节点</span></span>
+                <svg class="arw" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z"/></svg>
+              </button>
+              <div class="bd"><div class="inner" id="nodeLog">
+                <ul class="logs">
+                  <li><svg class="st" viewBox="0 0 24 24" fill="#2E6B4F"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>检查文件<span class="dur">0.12s</span></li>
+                  <li><svg class="st" viewBox="0 0 24 24" fill="#2E6B4F"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>PDF转Markdown<span class="dur">33.59s</span></li>
+                  <li><svg class="st" viewBox="0 0 24 24" fill="#2E6B4F"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>Markdown图片处理<span class="dur">943.98s</span></li>
+                  <li><svg class="st" viewBox="0 0 24 24" fill="#2E6B4F"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>文档切分<span class="dur">1.24s</span></li>
+                  <li><svg class="st" viewBox="0 0 24 24" fill="#2E6B4F"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>主体名称识别<span class="dur">2.08s</span></li>
+                  <li><svg class="st" viewBox="0 0 24 24" fill="#2E6B4F"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>向量生成<span class="dur">72.58s</span></li>
+                  <li><svg class="st" viewBox="0 0 24 24" fill="#2E6B4F"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>导入向量库<span class="dur">5.39s</span></li>
+                  <li><svg class="st" viewBox="0 0 24 24" fill="#2E6B4F"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>处理完成<span class="dur">0.01s</span></li>
+                </ul>
+              </div></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== COMPOSER (MD3 outlined text field) ==================== -->
+    <form class="composer" id="chatForm" autocomplete="off">
+      <div class="composer-in">
+        <div class="field" id="fld">
+          <textarea id="q" rows="1" placeholder=" " aria-describedby="qSupp"></textarea>
+          <label class="lb" for="q">请输入问题（Enter 发送，Shift+Enter 换行）</label>
+          <span class="supp" id="qSupp">知识库检索 · 8 条参考来源 · 支持追问澄清</span>
+        </div>
+        <div class="c-row">
+          <div class="kbd"><b>Enter</b> 发送 <b>Shift + Enter</b> 换行</div>
+          <button class="fab ink" type="submit" id="sendBtn" style="margin-inline-start:auto" aria-label="发送问题">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 20.9 12 3.4 3.6 3.4 10l12.6 2-12.6 2v6.4Z"/></svg>
+          </button>
+        </div>
+      </div>
+    </form>
+  </main>
+
+  <!-- ==================== MD3 NAVIGATION BAR (<=767) ==================== -->
+  <nav class="navbar" aria-label="底部导航">
+    <button class="nb ink" data-go="chat" aria-current="page">
+      <span class="icv"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2Z"/></svg></span>
+      <span>问答</span>
+    </button>
+    <button class="nb ink" data-go="import">
+      <span class="icv"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96ZM14 13v4h-4v-4H7l5-5 5 5h-3Z"/></svg></span>
+      <span>导入</span>
+    </button>
+    <button class="nb ink" data-noop>
+      <span class="icv"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z"/></svg></span>
+      <span>我的</span>
+    </button>
+  </nav>
+</div>
+
+<!-- MD3 snackbar -->
+<div class="snack" id="snack" role="status" aria-live="polite">
+  <span id="snackMsg">操作已完成</span>
+  <button type="button" id="snackAct">撤销</button>
+</div>
+
+<script>
+/* ==========================================================================
+   MD3 交互层（全部本地实现，零网络）
+   1) ripple 涟漪  2) tab/segmented 切换  3) expand container 折叠
+   4) text field 浮动 label + 模拟流式吐字  5) 引用角标定位  6) snackbar 反馈
+   ========================================================================== */
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- 1. ripple：点击坐标生成 span，300ms 扩散 ---------- */
+  document.addEventListener("pointerdown", function(e){
+    if(reduce) return;
+    var host = e.target.closest && e.target.closest(".ink");
+    if(!host || host.disabled) return;
+    var r = host.getBoundingClientRect();
+    var d = Math.max(r.width, r.height) * 2;
+    var s = document.createElement("span");
+    s.className = "rp";
+    s.style.width = s.style.height = d + "px";
+    s.style.left = (e.clientX - r.left - d/2) + "px";
+    s.style.top  = (e.clientY - r.top  - d/2) + "px";
+    host.appendChild(s);
+    setTimeout(function(){ if(s.parentNode) s.parentNode.removeChild(s); }, 320);
+  }, {passive:true});
+
+  /* ---------- 2. module switching (segmented + rail + navbar 同步) ---------- */
+  var titles = {chat:"知识检索问答", import:"文档导入与解析"};
+  function go(k){
+    if(!titles[k]) return;
+    document.getElementById("pane-chat").classList.toggle("active", k==="chat");
+    document.getElementById("pane-import").classList.toggle("active", k==="import");
+    Array.prototype.forEach.call(document.querySelectorAll('[role="tab"]'), function(t){
+      t.setAttribute("aria-selected", t.getAttribute("data-go")===k ? "true":"false");
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.nav-item[data-go], .nb[data-go]'), function(n){
+      if(n.getAttribute("data-go")===k) n.setAttribute("aria-current","page");
+      else n.removeAttribute("aria-current");
+    });
+    document.getElementById("viewTitle").textContent = titles[k];
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-go]'), function(el){
+    el.addEventListener("click", function(){ go(el.getAttribute("data-go")); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-noop]'), function(el){
+    el.addEventListener("click", function(){ sn("该视图未包含在本次 Demo 范围内"); });
+  });
+
+  /* ---------- 3. expand container 折叠面板 ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll(".exp"), function(box){
+    var hd = box.querySelector(".hd");
+    hd.addEventListener("click", function(){
+      var open = box.getAttribute("data-open") === "true";
+      box.setAttribute("data-open", open ? "false" : "true");
+      hd.setAttribute("aria-expanded", open ? "false" : "true");
+    });
+  });
+
+  /* ---------- 4. chips：assist（可多选开关）/ filter（组内单选） ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-toggle]"), function(c){
+    c.addEventListener("click", function(){
+      var on = c.getAttribute("aria-pressed") === "true";
+      /* 型号候选、来源过滤为组内单选（MD3 filter chip 语义） */
+      var single = c.parentNode && /^(candChips|srcFilter)$/.test(c.parentNode.id);
+      if(single){
+        Array.prototype.forEach.call(c.parentNode.children, function(o){ o.setAttribute("aria-pressed","false"); });
+        if(!on) c.setAttribute("aria-pressed","true");
+      } else {
+        c.setAttribute("aria-pressed", on ? "false" : "true");
+      }
+      if(c.parentNode && c.parentNode.id === "srcFilter") filterSrc();
+      if(c.parentNode && c.parentNode.id === "candChips") sn("已按所选主体重新组织答案：" + c.textContent);
+    });
+  });
+
+  /* ---------- 5. 引用角标 → 滚动定位 + 高亮 ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll(".cite"), function(c){
+    function jump(){
+      var li = document.getElementById("src-" + c.getAttribute("data-cite"));
+      if(!li) return;
+      li.scrollIntoView({block:"center", behavior: reduce ? "auto" : "smooth"});
+      li.classList.add("hl");
+      c.classList.add("flash");
+      setTimeout(function(){ li.classList.remove("hl"); c.classList.remove("flash"); }, 1200);
+    }
+    c.addEventListener("click", jump);
+    c.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); jump(); } });
+  });
+
+  /* ---------- 6. outlined text field：浮动 label (notch) + 自增高 ---------- */
+  var fld = document.getElementById("fld"), q = document.getElementById("q");
+  q.addEventListener("focus", function(){ fld.classList.add("floated"); });
+  q.addEventListener("blur", function(){ if(!q.value.trim()) fld.classList.remove("floated"); });
+  q.addEventListener("input", function(){
+    q.style.height = "auto";
+    q.style.height = Math.min(q.scrollHeight, 140) + "px";
+    if(q.value.trim()) fld.classList.add("floated");
+  });
+
+  /* ---------- 7. snackbar ---------- */
+  var snack = document.getElementById("snack"), sTimer = null;
+  function sn(msg){
+    document.getElementById("snackMsg").textContent = msg;
+    snack.classList.add("up");
+    clearTimeout(sTimer);
+    sTimer = setTimeout(function(){ snack.classList.remove("up"); }, 3200);
+  }
+  document.getElementById("snackAct").addEventListener("click", function(){
+    snack.classList.remove("up"); sn("已撤销");
+  });
+  document.getElementById("clearBtn").addEventListener("click", function(){ sn("已清空对话记录"); });
+  document.getElementById("detailBtn").addEventListener("click", function(){
+    sn("错误详情：PDF 加密或无法解析，已中止导入（code 500）");
+  });
+  document.getElementById("retryBtn").addEventListener("click", function(){ sn("已重新排队：损坏文件.pdf"); });
+
+  /* ---------- 8. 发送 → 模拟流式追加（setTimeout 逐段吐字，无网络） ---------- */
+  var form = document.getElementById("chatForm"), sendBtn = document.getElementById("sendBtn");
+  var segAnswer = ["正在确认问题产品…","切片搜索完成，命中 12 条。","重排序完成，保留 8 条参考来源。","正在生成答案…"];
+  /* 统一 Mock 时钟：从 20:24 起，每次发送 +1 分钟（不用真实时间，保证 10 套可对比） */
+  var mockBase = 20 * 60 + 24, mockCount = 0;
+  function nextTime(){
+    var t = mockBase + (++mockCount);
+    return String(Math.floor(t / 60) % 24).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+  }
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var v = q.value.trim();
+    if(!v){ sn("请输入问题后再发送"); return; }
+    var msgs = document.getElementById("msgs");
+    var hh = nextTime();
+    var rowU = document.createElement("div");
+    rowU.className = "row user";
+    rowU.innerHTML = '<div class="bubble-u"></div><span class="time"></span>';
+    rowU.querySelector(".bubble-u").textContent = v;
+    rowU.querySelector(".time").textContent = hh;
+    msgs.appendChild(rowU);
+
+    var rowB = document.createElement("div");
+    rowB.className = "row";
+    rowB.innerHTML = '<span class="avatar" aria-hidden="true">智</span><div class="bot"><div class="who">BOSS智库 · ' + hh + '</div>' +
+      '<div class="card e2"><div class="lin" id="tmpLin" style="width:100%;margin-bottom:12px"><i></i></div><div class="answer" id="tmpAns"></div></div></div>';
+    msgs.appendChild(rowB);
+    q.value = ""; fld.classList.remove("floated"); q.style.height = "56px";
+    sendBtn.disabled = true;
+    var ans = rowB.querySelector("#tmpAns"), lin = rowB.querySelector("#tmpLin");
+    var streamed = document.getElementById("streamSw").checked;
+    var segs = segAnswer.slice(), si = 0, para = null, done = false, timer = 0;
+
+    function newPara(){
+      para = document.createElement("p");
+      para.style.marginBottom = "6px";
+      ans.appendChild(para);
+    }
+    function finish(){
+      if(done) return; done = true;
+      clearInterval(timer);
+      if(lin.parentNode) lin.parentNode.removeChild(lin);
+      var p = document.createElement("p");
+      p.className = "lead";
+      p.textContent = "已根据知识库与联网来源整理完成，共引用 8 条参考来源。";
+      ans.appendChild(p);
+      sendBtn.disabled = false;
+      sn("答案已生成 · 共引用 8 条来源");
+    }
+    /* 单一定时器吐字：每拍 3 字 / 70ms；非流式一次一段。
+       2.5s 真实时间硬上限——后台标签被浏览器节流时也会一次性补齐并收尾 */
+    var start = Date.now();
+    newPara();
+    timer = setInterval(function(){
+      if(si >= segs.length){ finish(); return; }
+      if(Date.now() - start > 2500){
+        /* 补齐：当前段续写剩余部分，其余段各起一行，避免重复吐字 */
+        if(para){ para.textContent = segs[si]; si++; }
+        while(si < segs.length){ newPara(); para.textContent = segs[si++]; }
+        finish(); return;
+      }
+      var s = segs[si], take = streamed ? 3 : s.length;
+      para.textContent = s.slice(0, para.textContent.length + take);
+      if(para.textContent.length >= s.length){ si++; if(si < segs.length) newPara(); }
+      rowB.scrollIntoView({block:"nearest", behavior: reduce ? "auto" : "smooth"});
+    }, 70);
+    setTimeout(finish, 3200);
+  });
+  q.addEventListener("keydown", function(e){
+    if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event("submit",{cancelable:true})); }
+  });
+
+  /* ---------- 9. 拖拽上传区：dragover 视觉态 + 线性进度模拟 ---------- */
+  var drop = document.getElementById("drop"), upLin = document.getElementById("upLin");
+  ["dragenter","dragover"].forEach(function(t){
+    drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave","drop"].forEach(function(t){
+    drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function(){ simulateUpload(); });
+  drop.addEventListener("click", function(){ simulateUpload(); });
+  var upRunning = false;
+  function simulateUpload(){
+    if(upRunning) return;
+    upRunning = true; upLin.style.display = "block";
+    sn("上传中…（离线模拟，不会发起真实请求）");
+    setTimeout(function(){ upLin.style.display = "none"; upRunning = false; sn("上传完成：04-万用表操作手册.pdf 已进入处理队列"); }, 1800);
+  }
+
+  /* ---------- 10. 处理中文件的进度文案推进（本地计时器） ---------- */
+  var proc = document.getElementById("procStage"), pv = 62;
+  setInterval(function(){
+    pv = pv >= 99 ? 62 : pv + 3;
+    proc.textContent = (pv < 80 ? "向量生成 " : "导入向量库 ") + pv + "%";
+  }, 2000);
+
+  /* ---------- 11. 来源过滤（filter chip → 知识库 / 联网 单选） ---------- */
+  var srcBox = document.querySelector(".src");
+  var kbBtn = null, webBtn = null;
+  (function(){
+    var chips = document.querySelectorAll("#srcFilter [data-toggle]");
+    kbBtn = chips[0]; webBtn = chips[1];   /* 点击态由第 4 步统一处理，这里只取引用 */
+  })();
+  function filterSrc(){
+    var kb = kbBtn.getAttribute("aria-pressed")==="true";
+    var web = webBtn.getAttribute("aria-pressed")==="true";
+    Array.prototype.forEach.call(srcBox.children, function(li){
+      var isWeb = !!li.querySelector(".tag.web");
+      var show = (!kb && !web) || (kb && !isWeb) || (web && isWeb);
+      li.style.display = show ? "" : "none";
+    });
+  }
+})();
+</script>
+</body>
+</html>

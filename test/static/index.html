@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>跨域测试</h1>
+    <p>后端：http://127.0.0.1:8001/api/data</p>
+    <button onclick="test()">点我请求</button>
+    <pre id="r"></pre>
+
+    <script>
+        async function test() {
+            const r = document.getElementById('r');
+            try {
+                const res = await fetch('http://127.0.0.1:8001/api/data');
+                const data = await res.json();
+                r.innerText = '✅ 成功：' + JSON.stringify(data);
+            } catch (e) {
+                r.innerText = '❌ 失败：' + e.message;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!--
+  方案编号：09
+  风格名：Tesla 工业科幻 HUD 风 · 登录页（车机解锁面板）
+  负责子智能体：Sub-Agent-Tesla-Control
+  设计系统要点：
+    1) 零装饰：纯黑底 + #161A1D 面板 + 1px rgba(255,255,255,.12) 细线 + 2px 直角，唯一强调色冷调青蓝 #4DA3FF。
+    2) 控制台式排印：标签一律大写 + letter-spacing:.12em，所有数字/时间戳/状态码走等宽字体栈（本地字体，零外链）。
+    3) 动效克制：背景径向冷光与网格为静态层（opacity ≤ .35 / ≤ .04），无 blur、无持续动画；位移类动效 ≤200ms 且受 prefers-reduced-motion 控制。
+  签名交互：刻度进度轨「长按连接」1 秒真触发（pointerdown/up + rAF 计数 + 键盘等价），松手回退。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOSS智库知识库 · 车机解锁登录</title>
+<style>
+  :root{
+    --bg:#000000; --panel:#161A1D; --card:#1E2226; --hover:#2A2F33;
+    --t1:#F5F7F9; --t2:#C3CAD3; --t3:#8996A6;
+    --line:rgba(255,255,255,.12); --line-soft:rgba(255,255,255,.07);
+    --acc:#4DA3FF; --ok:#3EF7A0; --warn:#FFB84D;
+    --mono:ui-monospace,"Cascadia Mono","Consolas","Menlo","Courier New",monospace;
+    --sans:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--t2);
+    font-family:var(--sans); font-size:15px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:40px 24px 28px; position:relative; overflow-x:hidden;
+  }
+  /* ---- 背景层：静态径向冷光 + 细网格（无 blur、无动画） ---- */
+  .bg-glow{
+    position:fixed; inset:0; pointer-events:none; opacity:.32; z-index:0;
+    background:
+      radial-gradient(58% 46% at 50% 34%, rgba(77,163,255,.30), rgba(77,163,255,0) 62%),
+      radial-gradient(80% 60% at 50% 108%, rgba(62,247,160,.08), rgba(0,0,0,0) 60%);
+  }
+  .bg-grid{
+    position:fixed; inset:0; pointer-events:none; opacity:.035; z-index:0;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.9) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.9) 0 1px, transparent 1px 64px);
+  }
+  .stage{position:relative; z-index:1; width:100%; max-width:900px; display:flex; flex-direction:column; gap:0}
+
+  /* ---- 大写小字标签通用 ---- */
+  .cap{
+    font-family:var(--sans); font-size:11px; font-weight:600;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--t3);
+  }
+  .mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+
+  /* ---- 品牌区 ---- */
+  .brand{display:flex; align-items:flex-end; justify-content:space-between; gap:20px;
+    padding:0 0 14px; border-bottom:1px solid var(--line)}
+  .brand-l{display:flex; align-items:center; gap:14px}
+  .mark{width:38px; height:38px; flex:0 0 38px; border:1px solid var(--line); border-radius:2px;
+    display:grid; place-items:center; color:var(--t1); background:var(--panel)}
+  .mark svg{display:block}
+  .brand h1{margin:0; font-size:19px; font-weight:600; letter-spacing:.04em; color:var(--t1)}
+  .brand .sub{margin:2px 0 0; font-size:12px; color:var(--t3); letter-spacing:.02em}
+  .brand-r{text-align:right; font-family:var(--mono); font-size:11px; color:var(--t3); letter-spacing:.06em}
+  .brand-r b{color:var(--acc); font-weight:500}
+
+  /* ---- 主体：左状态轨 + 右解锁面板 ---- */
+  .cols{display:grid; grid-template-columns:216px 1fr; gap:1px; margin-top:1px}
+  .rail{background:var(--panel); border:1px solid var(--line); border-radius:2px; padding:16px 16px 18px}
+  .rail h2{margin:0 0 12px}
+  .rail dl{margin:0; display:flex; flex-direction:column; gap:9px}
+  .rail .row{display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    padding-bottom:9px; border-bottom:1px solid var(--line-soft)}
+  .rail .row:last-child{border-bottom:0; padding-bottom:0}
+  .rail .k{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--t3)}
+  .rail .v{font-family:var(--mono); font-size:12px; color:var(--t2); margin:0}
+  .rail .v.ok{color:var(--ok)}
+  .bar{display:block; height:3px; width:100%; background:var(--hover); border-radius:1px; margin-top:5px; overflow:hidden}
+  .bar i{display:block; height:100%; background:var(--acc); width:63%}
+
+  /* ---- 面板 ---- */
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:2px;
+    transition:border-color .18s linear}
+  .panel.is-fail{border-color:var(--warn)}
+  .panel.is-ok{border-color:rgba(62,247,160,.55)}
+  .panel.shake{animation:shake .18s linear 1}
+  @keyframes shake{0%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(4px)}75%{transform:translateX(-2px)}100%{transform:translateX(0)}}
+  .p-head{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px;
+    padding:12px 20px; border-bottom:1px solid var(--line); background:var(--card); border-radius:1px 1px 0 0}
+  .p-head .tag{font-size:11px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--t1)}
+  .p-head .r{display:flex; align-items:center; gap:14px; font-family:var(--mono); font-size:11px; color:var(--t3)}
+  .rdot{display:inline-flex; align-items:center; gap:7px; color:var(--t2); letter-spacing:.06em}
+  .rdot i{width:7px; height:7px; border-radius:50%; background:var(--ok); flex:0 0 7px}
+  .panel.is-fail .rdot i{background:var(--warn)}
+  .p-body{padding:22px 20px 20px}
+
+  /* ---- 字段：底线式输入 ---- */
+  .field{padding:14px 0 10px; border-bottom:1px solid var(--line); position:relative}
+  .flabel{display:block; font-size:11px; font-weight:600; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--t3); transition:color .15s linear}
+  .frow{display:flex; align-items:center; gap:10px}
+  .field input{
+    flex:1 1 auto; min-width:0; background:transparent; border:0; outline:0;
+    color:var(--t1); font-family:var(--sans); font-size:16px; padding:6px 0 4px; letter-spacing:.01em;
+  }
+  .field input::placeholder{color:#6B7885; font-size:14px; letter-spacing:.02em}
+  .uline{position:absolute; left:0; right:0; bottom:-1px; height:2px; background:transparent}
+  .field.focus .uline{background:var(--acc)}
+  .field.focus .flabel{color:var(--acc)}
+  .field.err .uline{background:var(--warn)}
+  .field.err .flabel{color:var(--warn)}
+  .toggle{
+    flex:0 0 auto; background:transparent; border:0; padding:4px 2px; cursor:pointer;
+    font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--t3);
+  }
+  .toggle:hover{color:var(--t1)}
+  .hint{margin:6px 0 0; font-size:12px; color:var(--warn)}
+  .hint[hidden]{display:none}
+  .field .meta{margin:6px 0 0; font-size:11px; color:var(--t3); letter-spacing:.04em}
+
+  /* ---- 控制列长条行 ---- */
+  .rows{margin:6px -20px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+  .crow{display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%;
+    padding:12px 20px; background:transparent; border:0; cursor:pointer; text-align:left;
+    color:var(--t2); font-family:var(--sans); font-size:13px; letter-spacing:.02em;
+    transition:background .15s linear, color .15s linear}
+  .crow + .crow{border-top:1px solid var(--line-soft)}
+  .crow:hover{background:var(--card); color:var(--t1)}
+  .crow .lbl{display:flex; align-items:center; gap:10px}
+  .crow .lbl span{font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase}
+  .crow .lbl .mut{color:var(--t3); font-weight:500}
+  .sw{position:relative; width:38px; height:16px; flex:0 0 38px; border:1px solid var(--line);
+    border-radius:2px; background:var(--hover)}
+  .sw i{position:absolute; top:2px; left:2px; width:14px; height:10px; background:var(--t3); border-radius:1px;
+    transition:left .15s linear, background .15s linear}
+  .crow[aria-checked="true"] .sw{border-color:var(--acc)}
+  .crow[aria-checked="true"] .sw i{left:20px; background:var(--acc)}
+  .arrow{font-family:var(--mono); font-size:12px; color:var(--t3); letter-spacing:.1em}
+  .crow:hover .arrow{color:var(--acc)}
+
+  /* ---- 主 CTA：白底黑字直角 ---- */
+  .cta{
+    display:block; width:100%; margin:18px 0 0; padding:15px 16px; cursor:pointer;
+    background:var(--t1); color:#000000; border:1px solid var(--t1); border-radius:2px;
+    font-family:var(--sans); font-size:14px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+    transition:background .15s linear;
+  }
+  .cta:hover{background:#F0F3F6}
+  .cta:active{background:#DDE3EA}
+  .cta[aria-disabled="true"]{background:var(--hover); border-color:var(--hover); color:var(--t3); cursor:default}
+  .cta .spin{font-family:var(--mono); letter-spacing:.06em; text-transform:none; font-weight:500}
+  .cta-note{margin:9px 0 0; text-align:center; font-family:var(--mono); font-size:11px; color:var(--t3); letter-spacing:.04em}
+
+  /* ---- 签名交互：刻度进度轨 + 长按连接 ---- */
+  .divider{display:flex; align-items:center; gap:12px; margin:22px 0 14px}
+  .divider span{flex:1 1 auto; height:1px; background:var(--line)}
+  .divider .cap{flex:0 0 auto}
+  .sso{background:var(--card); border:1px solid var(--line); border-radius:2px; padding:14px}
+  .sso-top{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+  .sso-top .n{font-family:var(--mono); font-size:11px; color:var(--t3); letter-spacing:.1em}
+  .track{position:relative; height:34px; margin-top:11px; border:1px solid var(--line);
+    border-radius:2px; background:#12161A; cursor:pointer; touch-action:none;
+    -webkit-user-select:none; user-select:none; overflow:hidden}
+  .ticks{position:absolute; inset:0; opacity:.5;
+    background:repeating-linear-gradient(90deg, rgba(255,255,255,.14) 0 1px, transparent 1px 10%)}
+  .fill{position:absolute; left:0; top:0; bottom:0; width:0%; background:rgba(77,163,255,.22);
+    border-right:1px solid var(--acc)}
+  .track-txt{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none;
+    font-family:var(--mono); font-size:11px; letter-spacing:.18em; color:var(--t2); text-transform:uppercase}
+  .track.done .fill{background:rgba(62,247,160,.20); border-right-color:var(--ok)}
+  .track.done .track-txt{color:var(--ok)}
+  .scale{display:flex; justify-content:space-between; margin-top:6px; font-family:var(--mono); font-size:10px; color:#6B7885}
+  .sso-cap{margin:9px 0 0; font-size:12px; color:var(--t3)}
+
+  /* ---- 第三方登录：细线直角方块图标行 ---- */
+  .tp{display:flex; gap:10px; margin-top:8px}
+  .tp button{flex:1 1 0; min-width:0; height:48px; background:transparent; border:1px solid var(--line);
+    border-radius:2px; color:var(--t2); cursor:pointer; display:grid; place-items:center;
+    transition:border-color .15s linear, background .15s linear, color .15s linear}
+  .tp button:hover{border-color:var(--acc); background:var(--hover); color:var(--t1)}
+  .tp button svg{display:block; width:22px; height:22px}
+
+  /* ---- 事件日志（静态预置一条失败错误） ---- */
+  .log{margin-top:20px; border-top:1px solid var(--line); padding-top:12px}
+  .log ul{margin:8px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:5px}
+  .log li{display:flex; gap:10px; font-family:var(--mono); font-size:11px; letter-spacing:.02em; color:var(--t3)}
+  .log li .code{color:var(--warn)}
+  .log li.ok .code{color:var(--ok)}
+  .log li .msg{color:var(--t2)}
+
+  .foot{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    margin-top:18px; padding-top:12px; border-top:1px solid var(--line);
+    font-size:11px; letter-spacing:.08em; color:var(--t3)}
+  .foot .mono{font-size:11px}
+
+  a:focus-visible,button:focus-visible,[role="button"]:focus-visible{
+    outline:2px solid var(--acc); outline-offset:2px; border-radius:2px}
+
+  @media (max-width:1180px){ .cols{grid-template-columns:1fr} .rail{order:2} }
+  @media (max-width:640px){
+    body{padding:24px 14px 20px}
+    .p-body{padding:18px 15px 16px}
+    .rows{margin:6px -15px 0}
+    .crow{padding:12px 15px}
+    .brand{flex-direction:column; align-items:flex-start; gap:10px}
+    .brand-r{text-align:left}
+    .p-head{padding:11px 14px}
+    .p-head .r{gap:10px}
+    .tp button{height:44px}
+  }
+  @media (max-width:400px){
+    .p-head .tag{font-size:10px; letter-spacing:.08em}
+    .p-head .r{font-size:10px; gap:8px}
+    .cta{letter-spacing:.1em; font-size:13px}
+    .sso-top{display:block}
+    .sso-top .n{margin-top:4px; display:block}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important}
+  }
+</style>
+</head>
+<body>
+<div class="bg-glow" aria-hidden="true"></div>
+<div class="bg-grid" aria-hidden="true"></div>
+
+<div class="stage">
+
+  <!-- 品牌区 -->
+  <header class="brand">
+    <div class="brand-l">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M4 19V6M9 19V9M14 19V4M19 19v-8"/>
+        </svg>
+      </span>
+      <div>
+        <h1>BOSS智库知识库</h1>
+        <p class="sub">企业级智能知识库系统 · 统一身份解锁控制台</p>
+      </div>
+    </div>
+    <div class="brand-r mono">NODE <b>CN-EAST-1</b> · BUILD 2026.10.17</div>
+  </header>
+
+  <div class="cols">
+
+    <!-- 左：系统状态轨 -->
+    <aside class="rail" aria-label="系统状态">
+      <h2 class="cap">System · 车机状态</h2>
+      <dl>
+        <div class="row"><dt class="k">Core</dt><dd class="v ok">READY</dd></div>
+        <div class="row"><dt class="k">检索服务</dt><dd class="v">12 ms</dd></div>
+        <div class="row"><dt class="k">向量库</dt><dd class="v">8 / 8 shards</dd></div>
+        <div class="row"><dt class="k">TLS</dt><dd class="v">AES-256-GCM</dd></div>
+        <div class="row" style="display:block">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="k">Index</span><span class="v mono">63.412 docs</span>
+          </div>
+          <span class="bar" role="img" aria-label="索引容量 63%"><i></i></span>
+        </div>
+        <div class="row"><dt class="k">接口</dt><dd class="v">127.0.0.1:8000</dd></div>
+      </dl>
+    </aside>
+
+    <!-- 右：解锁面板 -->
+    <section class="panel" id="panel" aria-label="登录面板">
+      <div class="p-head">
+        <span class="tag">Access · 知识库控制台</span>
+        <div class="r">
+          <span class="mono" id="stamp">2026-10-17 20:23:41</span>
+          <span class="rdot"><i aria-hidden="true"></i><span id="sysState">系统就绪</span></span>
+        </div>
+      </div>
+
+      <div class="p-body">
+        <form id="form" autocomplete="on" novalidate>
+
+          <div class="field" id="fAcc">
+            <label class="flabel" for="account">Account · 账号</label>
+            <div class="frow">
+              <input id="account" name="username" type="text"
+                     placeholder="手机号 / 邮箱 / 用户名" autocomplete="username" aria-describedby="errAcc">
+            </div>
+            <span class="uline" aria-hidden="true"></span>
+            <p class="hint" id="errAcc" hidden>请输入账号</p>
+          </div>
+
+          <div class="field" id="fPwd">
+            <label class="flabel" for="password">Password · 密码</label>
+            <div class="frow">
+              <input id="password" name="password" type="password"
+                     placeholder="请输入登录密码" autocomplete="current-password" aria-describedby="errPwd">
+              <button class="toggle" type="button" id="pwToggle" aria-pressed="false" aria-label="显示密码">SHOW</button>
+            </div>
+            <span class="uline" aria-hidden="true"></span>
+            <p class="hint" id="errPwd" hidden>请输入密码</p>
+            <p class="meta mono">DEMO 口令：boss / boss2026</p>
+          </div>
+
+          <!-- 控制列长条行：记住我 / 忘记密码 -->
+          <div class="rows">
+            <button class="crow" type="button" id="remember" role="switch" aria-checked="false">
+              <span class="lbl"><span>记住我</span><span class="mut">Remember</span></span>
+              <span class="sw" aria-hidden="true"><i></i></span>
+            </button>
+            <button class="crow" type="button" id="forgot">
+              <span class="lbl"><span>忘记密码</span><span class="mut">Recover</span></span>
+              <span class="arrow" aria-hidden="true">RESET &gt;</span>
+            </button>
+          </div>
+
+          <button class="cta" type="submit" id="submit">登录 · Connect</button>
+          <p class="cta-note" id="ctaNote">ENTER 提交 · 建议使用企业单点登录</p>
+
+          <!-- 签名交互：长按连接 -->
+          <div class="divider" aria-hidden="true"><span></span><span class="cap">Secondary</span><span></span></div>
+          <div class="sso">
+            <div class="sso-top">
+              <span class="cap">Hold to link · 长按建立安全通道</span>
+              <span class="n" id="pct">000%</span>
+            </div>
+            <div class="track" id="track" role="button" tabindex="0"
+                 aria-label="按住一秒完成长按连接，模拟企业单点登录">
+              <span class="ticks" aria-hidden="true"></span>
+              <span class="fill" id="fill" aria-hidden="true"></span>
+              <span class="track-txt" id="trackTxt">HOLD · 按住</span>
+            </div>
+            <div class="scale" aria-hidden="true">
+              <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+            </div>
+            <p class="sso-cap" id="ssoCap">按住进度按钮不放，保持 1 秒即可完成单点登录；中途松手进度自动回退。键盘操作：聚焦后按住空格键。</p>
+          </div>
+
+          <!-- 第三方登录 -->
+          <div class="divider" aria-hidden="true"><span></span><span class="cap">SSO Providers</span><span></span></div>
+          <div class="tp">
+            <button type="button" aria-label="使用企业微信登录" data-p="企业微信">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+                <path d="M9.2 4.4c-3.5 0-6.3 2.4-6.3 5.4 0 1.7.9 3.2 2.3 4.2l-.6 2 2.2-1.2c.7.2 1.5.3 2.4.3"/>
+                <path d="M15 8.6c3 0 5.4 2 5.4 4.6 0 1.5-.8 2.8-2 3.6l.5 1.8-2-1.1c-.6.2-1.3.2-1.9.2-3 0-5.4-2-5.4-4.6"/>
+                <circle cx="7" cy="8.6" r=".9" fill="currentColor" stroke="none"/>
+                <circle cx="11.2" cy="8.6" r=".9" fill="currentColor" stroke="none"/>
+                <circle cx="13.6" cy="13" r=".8" fill="currentColor" stroke="none"/>
+                <circle cx="17" cy="13" r=".8" fill="currentColor" stroke="none"/>
+              </svg>
+            </button>
+            <button type="button" aria-label="使用钉钉登录" data-p="钉钉">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+                <path d="M5 6.5h14M19 6.5c0 5-3.3 8.3-7.6 8.9"/>
+                <path d="M8.4 12.2 6 18.2l4.4-1.3"/>
+                <path d="M12.6 15.4c2.2 2 4.9 2.9 7.6 2.6"/>
+              </svg>
+            </button>
+            <button type="button" aria-label="使用飞书登录" data-p="飞书">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+                <path d="M4 15.5 20 6.2c-1.3 4.4-3.7 7.5-7 9.2l1.8 3.6-4-2.3c-2.4-.1-4.5-1-6.8-1.2Z"/>
+                <path d="M9.4 12.6 15 9"/>
+              </svg>
+            </button>
+            <button type="button" aria-label="使用 GitHub 登录" data-p="GitHub">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+                <path d="M15.6 20.4v-3c0-1-.3-1.6-.8-2 2.5-.3 4.6-1.5 4.6-5.2 0-1.2-.4-2.1-1-2.8.1-.3.4-1.4-.1-2.8-1 0-2 .4-2.7 1a8.5 8.5 0 0 0-4.6 0c-.7-.6-1.7-1-2.7-1-.5 1.4-.2 2.5-.1 2.8-.6.7-1 1.6-1 2.8 0 3.7 2.1 4.9 4.6 5.2-.4.4-.7.9-.8 1.6-.7.2-1.7.3-2.4-.2-.6-.4-.9-1.1-1.6-1.4-.6-.2-.8.2-.1.6.5.4 1 1 1.2 1.7.2.9 1.2 1.7 3.2 1.5v2.2"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- 事件日志：静态预置一条失败错误 -->
+          <div class="log">
+            <span class="cap">Recent activity · 事件日志</span>
+            <ul id="logList">
+              <li class="static"><span class="mono">20:21</span><span class="code">AUTH FAILED</span><span class="msg">· 用户名或密码错误</span></li>
+              <li class="static"><span class="mono">20:18</span><span class="code">SESSION CLOSED</span><span class="msg">· 会话已注销</span></li>
+            </ul>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <span>© 2026 BOSS智库 · 企业级智能知识库系统</span>
+    <span class="mono">后端接口地址：http://127.0.0.1:8000</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var panel=document.getElementById('panel'),
+      form=document.getElementById('form'),
+      acc=document.getElementById('account'),
+      pwd=document.getElementById('password'),
+      fAcc=document.getElementById('fAcc'),
+      fPwd=document.getElementById('fPwd'),
+      errAcc=document.getElementById('errAcc'),
+      errPwd=document.getElementById('errPwd'),
+      pwToggle=document.getElementById('pwToggle'),
+      remember=document.getElementById('remember'),
+      forgot=document.getElementById('forgot'),
+      submit=document.getElementById('submit'),
+      ctaNote=document.getElementById('ctaNote'),
+      sysState=document.getElementById('sysState'),
+      logList=document.getElementById('logList'),
+      stamp=document.getElementById('stamp'),
+      track=document.getElementById('track'),
+      fill=document.getElementById('fill'),
+      pct=document.getElementById('pct'),
+      trackTxt=document.getElementById('trackTxt'),
+      ssoCap=document.getElementById('ssoCap');
+
+  var OK_USER='boss', OK_PWD='boss2026', authed=false, busy=false;
+  var reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function p2(n){ return (n<10?'0':'')+n; }
+  function clock(withDate){
+    var d=new Date(), hm=p2(d.getHours())+':'+p2(d.getMinutes());
+    if(!withDate) return hm;
+    return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+' '+hm+':'+p2(d.getSeconds());
+  }
+  function tickClock(){ stamp.textContent=clock(true); }
+  tickClock(); window.setInterval(tickClock,1000);
+
+  function log(code,msg,ok){
+    var li=document.createElement('li');
+    if(ok) li.className='ok';
+    var t1=document.createElement('span'); t1.className='mono'; t1.textContent=clock(false);
+    var t2=document.createElement('span'); t2.className='code'; t2.textContent=code;
+    var t3=document.createElement('span'); t3.className='msg'; t3.textContent='· '+msg;
+    li.appendChild(t1); li.appendChild(t2); li.appendChild(t3);
+    logList.insertBefore(li, logList.firstChild);
+    while(logList.children.length>4) logList.removeChild(logList.lastChild);
+  }
+
+  /* ---- 底线式输入：focus 底线转青蓝 + 大写 label 亮起 ---- */
+  function fieldError(box,msg){
+    var isAcc=(box===fAcc), hint=isAcc?errAcc:errPwd, input=isAcc?acc:pwd;
+    if(msg){
+      hint.hidden=false; hint.textContent=msg;
+      input.setAttribute('aria-invalid','true');
+      box.classList.add('err','focus');
+    }else{
+      hint.hidden=true; input.removeAttribute('aria-invalid');
+    }
+  }
+  function bindField(input, box){
+    input.addEventListener('focus',function(){ box.classList.add('focus'); });
+    input.addEventListener('blur',function(){ if(!input.value) box.classList.remove('focus'); });
+    input.addEventListener('input',function(){
+      box.classList.remove('err'); fieldError(box,null); clearFail();
+    });
+  }
+  bindField(acc,fAcc); bindField(pwd,fPwd);
+
+  function setFail(msg){
+    panel.classList.remove('is-ok');
+    panel.classList.add('is-fail');
+    if(!reduce){
+      panel.classList.remove('shake'); void panel.offsetWidth; panel.classList.add('shake');
+    }
+    sysState.textContent='认证失败';
+    log('AUTH FAILED', msg, false);
+  }
+  function clearFail(){
+    if(authed) return;
+    panel.classList.remove('is-fail','shake');
+    sysState.textContent='系统就绪';
+  }
+  function setOk(via){
+    authed=true;
+    panel.classList.remove('is-fail','shake');
+    panel.classList.add('is-ok');
+    sysState.textContent='已连接';
+    submit.textContent='已验证 · 进入控制台';
+    submit.setAttribute('aria-disabled','true');
+    ctaNote.textContent='SESSION ACTIVE · 会话有效期 8 小时（'+via+'）';
+    log('AUTH OK','通过 '+via+' 建立会话，欢迎回来，管理员', true);
+  }
+
+  /* ---- 密码显隐：等宽 SHOW / HIDE ---- */
+  pwToggle.addEventListener('click',function(){
+    var show=(pwd.type==='password');
+    pwd.type=show?'text':'password';
+    pwToggle.textContent=show?'HIDE':'SHOW';
+    pwToggle.setAttribute('aria-pressed',show?'true':'false');
+    pwToggle.setAttribute('aria-label',show?'隐藏密码':'显示密码');
+    fPwd.classList.add('focus');
+    pwd.focus();
+  });
+
+  /* ---- 记住我开关 ---- */
+  remember.addEventListener('click',function(){
+    var on=(remember.getAttribute('aria-checked')!=='true');
+    remember.setAttribute('aria-checked',on?'true':'false');
+    remember.setAttribute('aria-label','记住我'+(on?'：已开启':'：已关闭'));
+    log(on?'DEVICE TRUSTED':'DEVICE UNTRUSTED', on?'本机已加入可信设备列表':'已取消记住本机', on);
+  });
+
+  /* ---- 忘记密码 ---- */
+  forgot.addEventListener('click',function(){
+    log('RECOVER SENT','重置链接已发送至绑定邮箱（演示）', true);
+  });
+
+  /* ---- 第三方登录 ---- */
+  var tps=document.querySelectorAll('.tp button');
+  for(var i=0;i<tps.length;i++){
+    tps[i].addEventListener('click',function(){
+      if(authed) return;
+      log('REDIRECT','正在跳转 '+this.getAttribute('data-p')+' 授权页（演示）', true);
+    });
+  }
+
+  /* ---- 主 CTA：登录（hover/focus/active/loading/错误态） ---- */
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    if(authed||busy) return;
+    var bad=false;
+    fAcc.classList.remove('err'); fPwd.classList.remove('err');
+    fieldError(fAcc,null); fieldError(fPwd,null);
+    if(!acc.value.trim()){ fieldError(fAcc,'请输入账号'); bad=true; }
+    if(!pwd.value){ fieldError(fPwd,'请输入密码'); bad=true; }
+    if(bad){ setFail('登录信息不完整'); return; }
+    if(acc.value.trim()!==OK_USER || pwd.value!==OK_PWD){
+      fieldError(fPwd,'用户名或密码错误');
+      setFail('用户名或密码错误');
+      return;
+    }
+    busy=true;
+    submit.setAttribute('aria-disabled','true');
+    submit.innerHTML='<span class="spin">验证中…</span>';
+    window.setTimeout(function(){ busy=false; setOk('账号口令'); }, 900);
+  });
+
+  /* ---- 签名交互：长按连接（pointerdown/up + rAF 计数 + 键盘等价） ---- */
+  var HOLD=1000, prog=0, raf=null, dir=1, done=false, holding=false, t0=0;
+  function paint(){
+    fill.style.width=(prog*100).toFixed(1)+'%';
+    pct.textContent=('00'+Math.round(prog*100)).slice(-3)+'%';
+  }
+  function loop(ts){
+    if(!t0) t0=ts;
+    var dt=ts-t0; t0=ts;
+    if(dir>0){ prog=Math.min(1, prog+dt/HOLD); }
+    else{ prog=Math.max(0, prog-dt/(HOLD*0.5)); }
+    paint();
+    if(dir>0 && prog>=1){ finish(); return; }
+    if(dir<0 && prog<=0){ idle(); return; }
+    raf=window.requestAnimationFrame(loop);
+  }
+  function start(e){
+    if(done||authed) return;
+    if(e&&e.preventDefault) e.preventDefault();
+    holding=true; dir=1; t0=0;
+    trackTxt.textContent='LINKING · 保持';
+    if(raf) window.cancelAnimationFrame(raf);
+    raf=window.requestAnimationFrame(loop);
+  }
+  function release(){
+    if(!holding||done) return;
+    holding=false; dir=-1; t0=0;
+    if(prog>0 && prog<1) trackTxt.textContent='RELEASED · 回退';
+    if(raf) window.cancelAnimationFrame(raf);
+    raf=window.requestAnimationFrame(loop);
+  }
+  function idle(){ raf=null; trackTxt.textContent='HOLD · 按住'; paint(); }
+  function finish(){
+    raf=null; done=true; holding=false;
+    track.classList.add('done');
+    trackTxt.textContent='LINK ESTABLISHED';
+    ssoCap.textContent='安全通道已建立，单点登录完成。';
+    track.setAttribute('aria-label','安全通道已建立，单点登录完成');
+    setOk('长按连接 SSO');
+  }
+  track.addEventListener('pointerdown',function(e){
+    if(track.setPointerCapture){ try{ track.setPointerCapture(e.pointerId); }catch(err){} }
+    start(e);
+  });
+  track.addEventListener('pointerup',function(){ release(); });
+  track.addEventListener('pointercancel',function(){ release(); });
+  track.addEventListener('pointerleave',function(){ if(holding) release(); });
+  track.addEventListener('keydown',function(e){
+    if(e.key===' '||e.key==='Enter'){ e.preventDefault(); start(null); }
+  });
+  track.addEventListener('keyup',function(e){
+    if(e.key===' '||e.key==='Enter'){ release(); }
+  });
+  track.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+  paint();
+})();
+</script>
+</body>
+</html>

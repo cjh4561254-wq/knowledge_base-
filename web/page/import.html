@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<!--
+  真实文档导入页 · 视觉基准: demo-preview/schemes/05-stripe.main.html (方案 05 · Stripe 流体渐变风)
+  设计系统要点:
+    1) hero 用纯 CSS 多层 radial-gradient 静态叠出 mesh 渐变 + clip-path polygon 斜切分区;
+       本机预览浏览器无 GPU, 因此零 filter:blur 大图层、零持续位移动画(@keyframes)。
+    2) 白卡 12px 圆角 + 三层柔和阴影(--sh), hover 抬升 4px 并加深中间层(--sh-hover)。
+    3) 主色 blurple #635BFF, 深藏青文字 #0A2540, 数字一律 tabular-nums 金额式对齐。
+  对接后端: POST /upload (multipart 字段名 files) · GET /status/{task_id} 轮询 ·
+            GET /result/{task_id}/md[?download=1] · GET /api/me · POST /logout。
+  零外部资源: 无 CDN / 无网络字体 / 无外链图; 单文件内联 CSS/JS。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>文档导入 · BOSS智库知识库</title>
+<style>
+/* ========== 共享 token(与 login.html / chat.html 同源) ========== */
+:root{
+  --blurple:#635BFF; --blurple-deep:#4F46E5; --cyan:#00D4FF; --purple:#A960FF; --pink:#FF5C99;
+  --ink:#0A2540; --sub:#425466; --body:#1A1F36; --page:#FFFFFF; --page-alt:#F6FBFF;
+  --ok:#0ED47E; --err:#DF1B51; --line:rgba(10,37,64,.10); --line-soft:rgba(10,37,64,.06);
+  --r-sm:8px; --r-md:10px; --r-lg:12px;
+  --sh:0 1px 2px rgba(10,37,64,.06), 0 8px 24px rgba(10,37,64,.08), 0 24px 48px rgba(10,37,64,.06);
+  --sh-hover:0 1px 2px rgba(10,37,64,.06), 0 14px 36px rgba(10,37,64,.14), 0 28px 56px rgba(10,37,64,.08);
+  --sans:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  --mono:"SFMono-Regular",Consolas,"Cascadia Mono",monospace;
+  /* 斜切高度: 窄屏减弱角度, 避免 hero 文字被切掉 */
+  --cut:clamp(44px, 5.2vw, 96px);
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans); color:var(--body); background:var(--page);
+  line-height:1.6; overflow-x:hidden;
+}
+button{font-family:inherit; cursor:pointer}
+a{color:inherit}
+:focus-visible{outline:3px solid rgba(99,91,255,.65); outline-offset:2px; border-radius:6px}
+.num{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"}
+/* 注意：UA 的 [hidden]{display:none} 会被下面 .ghost-btn/.result-links 的
+   display:inline-flex 覆盖掉，必须显式提权，否则「退出登录」「结果链接」会露出来 */
+[hidden]{display:none !important}
+
+/* ========== hero: 静态 mesh gradient + 斜切 ========== */
+.hero-wrap{
+  position:relative;
+  background:
+    radial-gradient(42% 58% at 10% 14%, rgba(99,91,255,.58), transparent 66%),
+    radial-gradient(34% 50% at 38% 4%,  rgba(0,212,255,.40),  transparent 64%),
+    radial-gradient(44% 62% at 76% 20%, rgba(169,96,255,.52), transparent 66%),
+    radial-gradient(36% 48% at 95% 72%, rgba(255,92,153,.42), transparent 64%),
+    linear-gradient(115deg, #0A2540 0%, #131b4d 46%, #1c2154 78%, #0A2540 100%);
+  clip-path:polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), 0 100%);
+  padding-bottom:calc(var(--cut) + 30px);
+  color:#fff;
+}
+.nav{max-width:1120px; margin:0 auto; padding:20px 32px 0}
+.nav-inner{
+  display:flex; align-items:center; gap:16px; width:100%; flex-wrap:wrap;
+  background:rgba(10,37,64,.42); border:1px solid rgba(255,255,255,.14);
+  border-radius:var(--r-lg); padding:10px 18px;
+}
+.logo{display:flex; align-items:center; gap:10px; font-weight:800; font-size:16px; letter-spacing:.2px; color:#fff}
+.logo svg{flex:none}
+.logo .crumb{font-weight:600; font-size:13px; color:rgba(255,255,255,.66); margin-left:2px}
+.nav-sp{flex:1 1 auto}
+.nav-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.ghost-btn{
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25); color:#fff;
+  border-radius:var(--r-sm); padding:7px 14px; font-size:13px; font-weight:600;
+  text-decoration:none; display:inline-flex; align-items:center; gap:7px;
+  transition:background .2s, transform .2s;
+}
+.ghost-btn:hover{background:rgba(255,255,255,.16); transform:translateY(-1px)}
+.ghost-btn:disabled{opacity:.55; cursor:default; transform:none}
+.account{display:flex; align-items:center; gap:9px; font-size:13px; color:rgba(255,255,255,.88); font-weight:600; min-width:0}
+.avatar{
+  flex:none; width:28px; height:28px; border-radius:var(--r-sm);
+  background:linear-gradient(135deg, var(--blurple), var(--purple) 60%, var(--pink));
+  display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:12.5px;
+}
+.account .who{max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+.hero{max-width:1120px; margin:0 auto; padding:52px 32px 8px}
+.eyebrow{
+  display:inline-flex; align-items:center; gap:8px;
+  border:1px solid rgba(255,255,255,.28); background:rgba(255,255,255,.08);
+  border-radius:999px; padding:6px 14px; font-size:12.5px; font-weight:600; color:rgba(255,255,255,.9);
+}
+.eyebrow i{width:8px; height:8px; border-radius:2px; background:linear-gradient(135deg,var(--cyan),var(--blurple)); flex:none}
+h1{font-size:clamp(28px, 4.4vw, 44px); font-weight:800; line-height:1.22; margin:18px 0 12px; letter-spacing:.4px}
+.hero-sub{font-size:16px; color:rgba(255,255,255,.78); max-width:620px}
+.hero-cta{display:flex; gap:14px; margin-top:26px; flex-wrap:wrap}
+.solid-btn{
+  background:var(--blurple); border:none; color:#fff; border-radius:var(--r-sm);
+  padding:12px 24px; font-size:15px; font-weight:700; box-shadow:var(--sh);
+  display:inline-flex; align-items:center; gap:8px;
+  transition:transform .2s, box-shadow .2s, background .2s;
+}
+.solid-btn:hover{transform:translateY(-2px); background:#5750F1; box-shadow:var(--sh-hover)}
+.solid-btn:active{transform:translateY(0)}
+/* 后端接口地址 pill: 这个信息必须一直可见 */
+.backend-pill{
+  display:inline-flex; align-items:center; gap:9px; flex-wrap:wrap;
+  margin-top:26px; padding:9px 15px; border-radius:999px;
+  border:1px solid rgba(255,255,255,.26); background:rgba(10,37,64,.66);
+  font-size:12.5px; color:rgba(255,255,255,.94); max-width:100%;
+}
+.backend-pill svg{flex:none}
+.backend-pill code{
+  font-family:var(--mono); font-size:12px; color:#fff; background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.22); border-radius:6px; padding:2px 9px; word-break:break-all;
+}
+
+/* ========== main ========== */
+main{max-width:1120px; margin:0 auto; padding:6px 32px 44px}
+.card{
+  background:#fff; border:1px solid var(--line-soft); border-radius:var(--r-lg); box-shadow:var(--sh);
+  padding:24px 26px;
+}
+.sec-t{
+  font-size:13.5px; font-weight:800; color:var(--ink); margin:22px 0 12px;
+  display:flex; align-items:center; gap:8px; letter-spacing:.3px;
+}
+.sec-t:first-child{margin-top:0}
+.sec-t .bar{width:4px; height:14px; border-radius:2px; background:linear-gradient(180deg, var(--blurple), var(--cyan)); flex:none}
+.sec-t .cnt{font-variant-numeric:tabular-nums}
+.card-hint{font-size:13px; color:var(--sub); margin-top:6px}
+
+/* ---------- 拖拽区 ---------- */
+.upload-area{
+  display:block; width:100%; text-align:center; cursor:pointer;
+  border:2px dashed rgba(99,91,255,.45); border-radius:var(--r-lg); background:var(--page-alt);
+  padding:32px 20px; color:var(--sub); margin-bottom:4px;
+  transition:border-color .2s, background .2s, transform .2s, box-shadow .2s;
+}
+.upload-area:hover{border-color:var(--blurple); background:rgba(99,91,255,.06); transform:translateY(-2px); box-shadow:var(--sh)}
+.upload-area b{display:block; color:var(--ink); font-size:15px; font-weight:800; margin-top:10px}
+.upload-area small{display:block; font-size:12px; margin-top:4px}
+.upload-area .up-ico{
+  width:54px; height:54px; margin:0 auto; border-radius:var(--r-md);
+  background:rgba(99,91,255,.09); border:1px solid rgba(99,91,255,.22);
+  display:flex; align-items:center; justify-content:center;
+}
+/* 拖入高亮态 */
+.upload-area.is-drag{
+  border-style:solid; border-color:var(--blurple); background:rgba(99,91,255,.12);
+  transform:translateY(-2px); box-shadow:0 0 0 4px rgba(99,91,255,.16), var(--sh);
+}
+.upload-area.is-drag b{color:var(--blurple-deep)}
+.file-input{display:none}
+
+/* ---------- 文件卡 ---------- */
+.file-list{margin-top:2px}
+.file-item{
+  display:flex; gap:14px; align-items:flex-start; margin-bottom:12px;
+  background:#fff; border:1px solid var(--line-soft); border-radius:var(--r-lg);
+  padding:16px 18px; box-shadow:var(--sh);
+  transition:transform .2s, box-shadow .2s;
+}
+.file-item:hover{transform:translateY(-4px); box-shadow:var(--sh-hover)}
+.f-ico{
+  flex:none; width:40px; height:40px; border-radius:var(--r-sm);
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(99,91,255,.08); border:1px solid rgba(99,91,255,.18);
+}
+.file-item.is-failed .f-ico{background:rgba(223,27,81,.07); border-color:rgba(223,27,81,.28)}
+.file-item.is-done .f-ico{background:rgba(14,212,126,.10); border-color:rgba(14,212,126,.34)}
+.file-info{flex:1; min-width:0; display:flex; flex-direction:column}
+.f-head{display:flex; align-items:flex-start; gap:12px; justify-content:space-between; flex-wrap:wrap}
+.file-name{font-size:14px; font-weight:700; color:var(--ink); word-break:break-all; min-width:0}
+.file-size{font-size:12px; color:var(--sub); margin-top:3px; font-variant-numeric:tabular-nums}
+
+/* 四态徽章(文字由 JS 直接赋值, 圆点走 ::before 生成, 不会被覆盖) */
+.status-badge{
+  flex:none; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+  border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:800;
+}
+.status-badge::before{content:""; width:7px; height:7px; border-radius:50%; flex:none; background:currentColor}
+.status-uploading{color:var(--blurple-deep); background:rgba(99,91,255,.08); border:1px solid rgba(99,91,255,.40)}
+.status-uploading::before{background:var(--blurple)}
+.status-processing{color:#0B6FA4; background:rgba(0,212,255,.10); border:1px solid rgba(99,91,255,.34)}
+.status-processing::before{background:linear-gradient(135deg, var(--cyan), var(--blurple))}
+.status-completed{color:#067A46; background:rgba(14,212,126,.10); border:1px solid rgba(14,212,126,.50)}
+.status-completed::before{background:var(--ok)}
+.status-error{color:var(--err); background:rgba(223,27,81,.07); border:1px solid rgba(223,27,81,.40)}
+.status-error::before{background:var(--err)}
+
+/* 线性进度条 */
+.progress-bar-container{
+  width:100%; height:6px; border-radius:999px; background:rgba(10,37,64,.08);
+  margin-top:10px; overflow:hidden; display:none;
+}
+.progress-bar{
+  height:100%; width:0; border-radius:999px; background:var(--blurple);
+  transition:width .35s ease, background-color .3s;
+}
+.progress-bar-container.is-processing .progress-bar{background:linear-gradient(90deg, var(--cyan), var(--blurple) 55%, var(--purple))}
+.progress-bar-container.is-done .progress-bar{background:linear-gradient(90deg, var(--ok), #0BB469)}
+.progress-bar-container.is-error .progress-bar{background:var(--err)}
+
+/* 节点日志折叠(Stripe 式柔和展开) */
+.log-details{
+  margin-top:10px; font-size:12px; color:var(--sub);
+  border:1px solid var(--line-soft); border-radius:var(--r-md);
+  background:var(--page-alt); overflow:hidden;
+}
+.log-details summary{
+  cursor:pointer; user-select:none; list-style:none;
+  display:flex; align-items:center; gap:8px; padding:9px 13px;
+  font-size:12.5px; font-weight:700; color:var(--ink);
+  transition:background .2s;
+}
+.log-details summary::-webkit-details-marker{display:none}
+.log-details summary:hover{background:rgba(99,91,255,.05)}
+.log-details summary::after{
+  content:""; margin-left:auto; flex:none; width:14px; height:14px; background-repeat:no-repeat; background-position:center;
+  background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M3 5.5L7 9.5l4-4' fill='none' stroke='%23425466' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  transition:transform .25s;
+}
+.log-details[open] summary::after{transform:rotate(180deg)}
+.log-list{margin:0; padding:4px 13px 8px; list-style:none; border-top:1px dashed var(--line)}
+.log-list li{
+  display:flex; align-items:center; gap:9px; padding:5px 0; line-height:1.45;
+  font-size:12.5px; color:var(--body); border-bottom:1px dashed var(--line-soft);
+}
+.log-list li:last-child{border-bottom:none}
+.log-list li::before{
+  content:""; flex:none; width:13px; height:13px; border-radius:50%;
+  border:1.6px solid rgba(10,37,64,.22);
+}
+.log-list li.is-done::before{border-color:rgba(14,212,126,.8); background:rgba(14,212,126,.18)}
+.log-list li.is-run::before{border-color:rgba(99,91,255,.8); background:linear-gradient(135deg, rgba(0,212,255,.35), rgba(99,91,255,.35))}
+.log-list li.is-empty::before{display:none}
+.log-list li.is-empty{justify-content:center; color:var(--sub); font-weight:600; border-bottom:none}
+
+/* 错误条: 左描边 + 浅底, 文案完整不截断 */
+.error-text{
+  margin-top:10px; padding:9px 12px;
+  border:1px solid rgba(223,27,81,.28); border-left:3px solid var(--err);
+  border-radius:0 var(--r-sm) var(--r-sm) 0;
+  background:rgba(223,27,81,.06); color:#B01040;
+  font-size:12.5px; font-weight:600; line-height:1.55;
+  word-break:break-all; white-space:pre-wrap;
+}
+
+/* 结果链接按钮组 */
+.result-links{margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px}
+.result-links a{
+  font-size:12px; font-weight:700; color:var(--blurple-deep); background:#fff; text-decoration:none;
+  border:1.5px solid rgba(99,91,255,.4); border-radius:7px; padding:4px 11px;
+  display:inline-flex; align-items:center; gap:5px; transition:all .2s;
+}
+.result-links a:hover{background:var(--blurple); border-color:var(--blurple); color:#fff; transform:translateY(-2px)}
+.result-links span{
+  font-size:12px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums;
+  background:var(--page-alt); border:1px solid var(--line-soft); border-radius:7px; padding:4px 10px;
+}
+
+/* 空态 */
+.empty{
+  border:1px dashed var(--line); border-radius:var(--r-md); background:var(--page-alt);
+  padding:18px 20px; color:var(--sub); font-size:13.5px; text-align:center;
+}
+.empty b{color:var(--ink)}
+
+footer{
+  border-top:1px solid var(--line-soft); padding:20px 32px 28px;
+  text-align:center; font-size:12.5px; color:var(--sub); background:var(--page-alt);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width:900px){
+  .hero{padding-top:42px}
+  main{padding:6px 20px 34px}
+  .nav{padding:16px 20px 0}
+  .card{padding:20px 18px}
+}
+@media (max-width:768px){
+  :root{--cut:clamp(26px, 3.4vw, 44px)}
+  h1{font-size:32px}
+  .hero{padding:36px 20px 8px}
+  .file-item{flex-wrap:wrap}
+  .f-head{gap:8px}
+}
+@media (max-width:420px){
+  :root{--cut:18px}
+  .nav-inner{flex-direction:column; align-items:flex-start; gap:10px}
+  .nav-sp{display:none}
+  .nav-actions{width:100%; justify-content:space-between}
+  .account .who{max-width:110px}
+  h1{font-size:26px}
+  .hero-sub{font-size:14px}
+  .hero-cta .solid-btn{width:100%; justify-content:center}
+  .upload-area{padding:26px 14px}
+  .file-item{padding:14px}
+  .f-head{flex-direction:column; align-items:flex-start; gap:8px}
+  .status-badge{align-self:flex-start}
+  .backend-pill{border-radius:var(--r-md)}
+}
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{transition:none !important; animation:none !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= HERO:静态 mesh 渐变 + 斜切分区 ================= -->
+<div class="hero-wrap">
+  <header class="nav">
+    <div class="nav-inner">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true">
+          <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#00D4FF"/><stop offset=".55" stop-color="#635BFF"/><stop offset="1" stop-color="#A960FF"/>
+          </linearGradient></defs>
+          <rect x="2" y="4" width="22" height="18" rx="4" fill="none" stroke="url(#lg)" stroke-width="2.4"/>
+          <path d="M7 10h7M7 14h12" stroke="url(#lg)" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        BOSS智库知识库<span class="crumb">/ 文档导入</span>
+      </div>
+      <span class="nav-sp"></span>
+      <nav class="nav-actions" aria-label="主操作">
+        <a class="ghost-btn" href="/chat.html">
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12v8H9l-3 2.5v-2.5H2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          知识检索
+        </a>
+        <span class="account">
+          <span class="avatar" id="userAvatar" aria-hidden="true">—</span>
+          <span class="who" id="currentUserLabel">正在确认登录状态…</span>
+        </span>
+        <button class="ghost-btn" id="logoutBtn" type="button" hidden>退出登录</button>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" aria-label="文档导入">
+    <span class="eyebrow"><i aria-hidden="true"></i>PDF / Markdown → 解析 → 切片 → 向量库</span>
+    <h1>把企业文档变成能被回答的知识</h1>
+    <p class="hero-sub">上传后自动走完导入流水线，每个节点的执行进度、生成的 Markdown 与切片数量都在这里查看。</p>
+    <div class="hero-cta">
+      <button class="solid-btn" type="button" id="heroPickBtn">
+        选择文件开始导入
+        <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true" style="vertical-align:-2px"><path d="M3 7.5h8M8 4l3.5 3.5L8 11" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <p class="backend-pill">
+      <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><rect x="1.5" y="2.5" width="12" height="4" rx="1.2" fill="none" stroke="#00D4FF" stroke-width="1.5"/><rect x="1.5" y="8.5" width="12" height="4" rx="1.2" fill="none" stroke="#00D4FF" stroke-width="1.5"/><circle cx="4.3" cy="4.5" r=".9" fill="#0ED47E"/><circle cx="4.3" cy="10.5" r=".9" fill="#0ED47E"/></svg>
+      后端接口地址：<code id="apiBaseLabel"></code>
+    </p>
+  </section>
+</div>
+
+<main>
+  <section class="card" aria-label="上传与任务列表">
+    <h2 class="sec-t"><span class="bar" aria-hidden="true"></span>选择文件</h2>
+    <p class="card-hint">支持 PDF 与 Markdown，可一次选择或拖入多个文件；每个文件会独立创建一个导入任务。</p>
+
+    <div class="upload-area" id="dropZone" role="button" tabindex="0" aria-label="点击或拖拽文件到此处上传，支持 PDF 与 Markdown">
+      <span class="up-ico" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 34 34">
+          <path d="M17 23V8M10 14.5L17 8l7 6.5" fill="none" stroke="#635BFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M6 27h22" stroke="#A960FF" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <b>点击或拖拽文件到此处 (PDF/MD)</b>
+      <small>松开即上传；类型不符时文件卡会直接给出原因</small>
+      <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.md">
+    </div>
+
+    <h2 class="sec-t"><span class="bar" aria-hidden="true"></span>文件列表（<span class="cnt num" id="fileListCount">0</span>）</h2>
+
+    <div class="empty" id="emptyState">还没有文件。从上方拖入，或点「选择文件开始导入」挑一个 <b>.pdf / .md</b>。</div>
+
+    <div id="fileList" class="file-list">
+        <!-- 文件列表将在这里生成 -->
+    </div>
+  </section>
+</main>
+
+<footer>导入任务在服务器端异步执行，关掉本页不会中断已提交的任务；处理时间取决于文档长度与视觉模型耗时（可达分钟级）。</footer>
+
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const emptyState = document.getElementById('emptyState');
+    const fileListCount = document.getElementById('fileListCount');
+
+    // 后端接口基址
+    // 为什么默认用「同源相对路径」而不是硬编码 http://127.0.0.1:8000：
+    //   页面本身由 import_service 的 GET /import.html 提供，同源请求根本不触发 CORS；
+    //   后端已上鉴权，同源请求才会自动带上 session cookie。
+    //   而硬编码 127.0.0.1 时，只要用户从 http://localhost:8000 打开页面就变成跨域
+    //   （课程文档特别提醒：localhost 与 127.0.0.1 也算不同源）。
+    // 前端独立跑在别的端口（如 vite 5173）时，用 ?api_base=http://localhost:8000 或
+    // 在全局设 window.IMPORT_API_BASE 覆盖即可，不用改代码。
+    function resolveApiBase() {
+        const params = new URLSearchParams(location.search);
+        const forced = params.get('api_base') || (window.IMPORT_API_BASE || '').trim();
+        if (forced) return forced.replace(/\/+$/, '');
+        if (location.protocol === 'http:' || location.protocol === 'https:') return '';
+        // file:// 直接双击打开页面时的兜底（此时必须走绝对地址 + 后端 CORS）
+        return 'http://localhost:8000';
+    }
+
+    const API_BASE = resolveApiBase();
+    const POLL_INTERVAL_MS = 2000;
+    // 导入一条手册要过视觉模型 + 向量化，耗时可能是分钟级；给 30 分钟上限，
+    // 超时就停轮询并提示，而不是永远转圈。
+    const POLL_TIMEOUT_MS = 30 * 60 * 1000;
+
+    document.getElementById('apiBaseLabel').textContent = API_BASE || location.origin;
+
+    /* ================= 鉴权（后端已上线） ================= */
+    // 401 一律跳登录页并带上 next，绝不能被下面的 !res.ok 吞成「上传失败」，
+    // 那是完全误导的文案——真实原因是会话过期 / 未登录。
+    let redirectingToLogin = false;
+    function gotoLogin() {
+        if (redirectingToLogin) return;
+        redirectingToLogin = true;
+        location.href = '/login.html?next=' + encodeURIComponent(location.pathname);
+    }
+    function isUnauthorized(res) {
+        if (res && res.status === 401) {
+            gotoLogin();
+            return true;
+        }
+        return false;
+    }
+
+    const currentUserLabel = document.getElementById('currentUserLabel');
+    const userAvatar = document.getElementById('userAvatar');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    function renderAccount(data) {
+        const username = (data && data.username) || '';
+        const display = (data && data.display_name) || username || '';
+        if (!display) return;
+        currentUserLabel.textContent = display;
+        currentUserLabel.title = username ? `${display}（${username}）` : display;
+        userAvatar.textContent = display.slice(0, 1).toUpperCase();
+        logoutBtn.hidden = false;
+    }
+
+    // 加载即探测身份：静态预览（无后端）会 404，这里静默忽略即可；
+    // 401 才说明真的没登录 —— 直接去登录页。
+    async function loadCurrentUser() {
+        try {
+            const res = await fetch(`${API_BASE}/api/me`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (isUnauthorized(res)) return;
+            if (!res.ok) { currentUserLabel.textContent = '未连接服务'; return; }
+            renderAccount(await res.json().catch(() => null));
+        } catch (e) {
+            // 后端不可达：不打扰用户，导入区的错误条会自己说话
+            currentUserLabel.textContent = '未连接服务';
+        }
+    }
+    loadCurrentUser();
+
+    logoutBtn.addEventListener('click', async () => {
+        if (logoutBtn.disabled) return;
+        logoutBtn.disabled = true;
+        redirectingToLogin = true; // 注销后的跳转不带 next
+        try {
+            await fetch(`${API_BASE}/logout`, { method: 'POST', credentials: 'same-origin' });
+        } catch (e) {
+            /* 网络失败也照样把用户送到登录页：cookie 已由服务端尽力清除 */
+        }
+        location.href = '/login.html';
+    });
+
+    /* ================= 拖拽 / 选择 ================= */
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('is-drag');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('is-drag');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('is-drag');
+        handleFiles(e.dataTransfer.files);
+        fileInput.value = ''; // 允许再次选择同一个文件
+    });
+
+    function openFilePicker() {
+        fileInput.click();
+    }
+    dropZone.addEventListener('click', openFilePicker);
+    dropZone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openFilePicker();
+        }
+    });
+    document.getElementById('heroPickBtn').addEventListener('click', openFilePicker);
+
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    function handleFiles(files) {
+        Array.from(files).forEach(uploadFile);
+    }
+
+    function refreshListHead() {
+        const n = fileList.children.length;
+        fileListCount.textContent = n;
+        emptyState.hidden = n > 0;
+    }
+
+    /* ================= 进度条 / 状态 ================= */
+    // 颜色不再靠 JS 改 backgroundColor（那会写死内联样式），
+    // 而是切容器上的状态类，配色统一走 CSS token。
+    function updateProgressBar(bar, percentage) {
+        bar.style.width = percentage + '%';
+        const box = bar.parentElement;
+        if (!box) return;
+        box.classList.toggle('is-done', percentage >= 100);
+        if (percentage >= 100) box.classList.remove('is-error');
+    }
+
+    function markProcessing(bar) {
+        const box = bar.parentElement;
+        if (box) box.classList.add('is-processing');
+    }
+
+    function markFailedUi(itemEl) {
+        itemEl.classList.add('is-failed');
+        itemEl.classList.remove('is-done');
+        const box = itemEl.querySelector('.progress-bar-container');
+        // is-error 在 CSS 里排在 is-done / is-processing 之后，所以能稳定盖住渐变色
+        if (box) box.classList.add('is-error');
+    }
+
+    function markDoneUi(itemEl) {
+        itemEl.classList.add('is-done');
+        itemEl.classList.remove('is-failed');
+    }
+
+    function showError(itemEl, message) {
+        // 把错误打到界面上（同时保留 console 便于开发排查）
+        const box = itemEl.querySelector('.error-text');
+        if (box) {
+            box.textContent = message;
+            box.hidden = false; // 必须先取消 hidden，否则写了文字也看不见
+        }
+        console.error(message);
+    }
+
+    function makeFailed(statusBadge, itemEl, message) {
+        statusBadge.textContent = '失败';
+        statusBadge.className = 'status-badge status-error';
+        markFailedUi(itemEl);
+        showError(itemEl, message);
+    }
+
+    // 与后端 ALLOWED_EXTENSIONS 保持一致（web/api/import_service.py）
+    function isSupported(name) {
+        return /\.(pdf|md)$/i.test(name);
+    }
+
+    function formatSize(bytes) {
+        const n = Number(bytes) || 0;
+        if (n < 1024) return `${n} B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(2)} KB`;
+        return `${(n / 1024 / 1024).toFixed(2)} MB`;
+    }
+
+    // 读取 FastAPI 的错误响应：HTTPException 走 {"detail": "..."}，
+    // 自定义 JSONResponse 走 {"message": "..."}，两种都要能显示出来。
+    async function extractError(response) {
+        try {
+            const data = await response.json();
+            return data.detail || data.message || JSON.stringify(data);
+        } catch (e) {
+            const text = await response.text().catch(() => '');
+            return text || `HTTP ${response.status} ${response.statusText}`;
+        }
+    }
+
+    async function uploadFile(file) {
+        // 创建文件项UI
+        const id = 'file-' + Math.random().toString(36).substr(2, 9);
+        const html = `
+            <div class="file-item" id="${id}">
+                <span class="f-ico" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 20 20"><path d="M5 2h7l3 3v13H5z" fill="none" stroke="#635BFF" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 9h4M8 12h4" stroke="#635BFF" stroke-width="1.4" stroke-linecap="round"/></svg>
+                </span>
+                <div class="file-info">
+                    <div class="f-head">
+                        <span class="file-name">${file.name}</span>
+                        <span class="status-badge status-uploading">上传中...</span>
+                    </div>
+                    <span class="file-size">${formatSize(file.size)}</span>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar"></div>
+                    </div>
+                    <div class="error-text" hidden></div>
+                    <div class="result-links" hidden></div>
+                    <details class="log-details">
+                        <summary>日志（点击展开）</summary>
+                        <ul class="log-list"><li class="is-empty">暂无日志</li></ul>
+                    </details>
+                </div>
+            </div>
+        `;
+        fileList.insertAdjacentHTML('afterbegin', html);
+        refreshListHead();
+        const itemEl = document.getElementById(id);
+        const statusBadge = itemEl.querySelector('.status-badge');
+        const progressBar = itemEl.querySelector('.progress-bar');
+        const progressContainer = itemEl.querySelector('.progress-bar-container');
+
+        // 前端先挡一次类型：省一个来回，也避免用户以为传上去了
+        if (!isSupported(file.name)) {
+            makeFailed(statusBadge, itemEl, `「${file.name}」类型不支持：仅支持 PDF / Markdown 文件`);
+            return;
+        }
+
+        // 构建FormData：字段名必须与后端 `files: List[UploadFile] = File(...)` 的参数名一致
+        const formData = new FormData();
+        formData.append('files', file);
+
+        try {
+            // 1. 上传文件
+            progressContainer.style.display = 'block';
+            // 浏览器原生 fetch 拿不到上传字节进度，这里先给一个视觉占位
+            updateProgressBar(progressBar, 50);
+
+            const response = await fetch(`${API_BASE}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            // 未登录/会话过期：跳登录页，不要报「上传失败」
+            if (isUnauthorized(response)) {
+                statusBadge.textContent = '登录已过期';
+                statusBadge.className = 'status-badge status-error';
+                return;
+            }
+
+            if (!response.ok) {
+                makeFailed(statusBadge, itemEl, `上传失败（${response.status}）：${await extractError(response)}`);
+                return;
+            }
+
+            const result = await response.json();
+            // 后端返回 {code, message, task_ids: [...], items: [...]}
+            const taskId = (result.task_ids && result.task_ids[0]) || (result.items && result.items[0] && result.items[0].task_id);
+            if (!taskId) {
+                makeFailed(statusBadge, itemEl, '上传失败：后端未返回 task_id，响应内容为 ' + JSON.stringify(result));
+                return;
+            }
+
+            // 上传完成，进入处理中，进度固定为30%
+            updateProgressBar(progressBar, 30);
+            markProcessing(progressBar);
+            statusBadge.textContent = '处理中...';
+            statusBadge.className = 'status-badge status-processing';
+
+            // 2. 轮询状态（导入侧用轮询 GET /status/{task_id}，非 SSE）
+            pollStatus(taskId, itemEl);
+
+        } catch (error) {
+            if (redirectingToLogin) return; // 正在跳登录页，别覆盖成网络错误文案
+            // fetch 抛异常基本只有两种：后端没起 / CORS 被拦 / 网络中断
+            makeFailed(statusBadge, itemEl,
+                `无法连接导入服务（${API_BASE || location.origin}）：${error.message}；` +
+                `请确认已启动 uvicorn web.api.import_service:app 并监听 8000 端口`);
+        }
+    }
+
+    function normalizeDoneLog(text) {
+        // 后端可能返回中文节点名，也可能已拼接“已完成”
+        if (typeof text !== 'string') return String(text);
+        return text.endsWith('已完成') ? text : `${text}已完成`;
+    }
+
+    function normalizeRunningLog(text) {
+        // 后端可能返回中文节点名，也可能已拼接“正在进行.../处理中...”
+        if (typeof text !== 'string') return String(text);
+        if (text.startsWith('正在进行')) return text.endsWith('...') ? text : `${text}...`;
+        return `正在进行${text}...`;
+    }
+
+    function renderLogs(itemEl, doneList, runningList) {
+        const logSummary = itemEl.querySelector('.log-details summary');
+        const logListEl = itemEl.querySelector('.log-list');
+        const logDetails = itemEl.querySelector('.log-details');
+
+        const done = Array.isArray(doneList) ? doneList : [];
+        const running = Array.isArray(runningList) ? runningList : [];
+
+        // 更新 summary（即使收起也能看到进度）
+        logSummary.textContent = `日志（已完成${done.length}，进行中${running.length}，点击展开）`;
+
+        // 清空并重建列表
+        logListEl.innerHTML = '';
+        const lines = [
+            ...done.map(normalizeDoneLog),
+            ...running.map(normalizeRunningLog),
+        ];
+
+        if (lines.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = '暂无日志';
+            li.className = 'is-empty';
+            logListEl.appendChild(li);
+        } else {
+            for (let i = 0; i < lines.length; i++) {
+                const li = document.createElement('li');
+                li.textContent = lines[i];
+                // 前 done.length 条是已完成，其余是进行中
+                li.className = i < done.length ? 'is-done' : 'is-run';
+                logListEl.appendChild(li);
+            }
+        }
+
+        // 如果没有任何日志，默认收起；否则保持用户选择
+        if (lines.length === 0) {
+            logDetails.open = false;
+        }
+    }
+
+    function renderResultLinks(itemEl, taskId, result) {
+        // 导入成功后给出产物入口：md 由本服务的 /result/{task_id}/md 提供；
+        // 正文里的图片是 MinIO 匿名直链（http://localhost:9100/knowledge-base/upload-images/...），
+        // 浏览器打开 md 时能直接显示，无需本服务代理。
+        const box = itemEl.querySelector('.result-links');
+        if (!box) return;
+        const mdPath = (result && result.md_path) || '';
+        if (!mdPath) return;
+        box.hidden = false;
+        box.innerHTML =
+            `<a href="${API_BASE}/result/${taskId}/md" target="_blank" rel="noopener">查看Markdown</a>` +
+            `<a href="${API_BASE}/result/${taskId}/md?download=1">下载Markdown</a>` +
+            (result.chunk_count ? `<span>切片数：${result.chunk_count}</span>` : '');
+    }
+
+    function pollStatus(taskId, itemEl) {
+        const statusBadge = itemEl.querySelector('.status-badge');
+        const progressBar = itemEl.querySelector('.progress-bar');
+        const startedAt = Date.now();
+        let consecutiveErrors = 0;
+
+        const interval = setInterval(async () => {
+            if (redirectingToLogin) { clearInterval(interval); return; }
+
+            if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+                clearInterval(interval);
+                statusBadge.textContent = '超时';
+                statusBadge.className = 'status-badge status-error';
+                markFailedUi(itemEl);
+                showError(itemEl, '处理超时（超过30分钟未完成）：请到服务端日志确认导入任务是否仍在运行');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/status/${taskId}`);
+
+                // 会话过期：停止轮询并跳登录，不要累计成「连续失败」
+                if (isUnauthorized(res)) {
+                    clearInterval(interval);
+                    statusBadge.textContent = '登录已过期';
+                    statusBadge.className = 'status-badge status-error';
+                    return;
+                }
+
+                // 404 = 任务不存在（服务重启后内存任务表被清空），必须停止轮询
+                if (res.status === 404) {
+                    clearInterval(interval);
+                    makeFailed(statusBadge, itemEl, `状态查询失败：${await extractError(res)}`);
+                    return;
+                }
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${await extractError(res)}`);
+                }
+
+                const data = await res.json();
+                consecutiveErrors = 0;
+
+                // 渲染日志（done/running）
+                renderLogs(itemEl, data.done_list, data.running_list);
+
+                if (data.status === 'completed') {
+                    statusBadge.textContent = '已完成';
+                    statusBadge.className = 'status-badge status-completed';
+                    markProcessing(progressBar);
+                    updateProgressBar(progressBar, 100);
+                    markDoneUi(itemEl);
+                    renderResultLinks(itemEl, data.task_id || taskId, data.result);
+                    clearInterval(interval);
+                } else if (data.status === 'failed') {
+                    // 后端把 ImportProcessError.to_dict() 的 message 放在 error 字段
+                    const reason = data.error || '导入流程执行失败（服务端未提供原因，请查看服务日志）';
+                    clearInterval(interval);
+                    makeFailed(statusBadge, itemEl, `导入失败：${reason}`);
+                } else {
+                    // pending / processing：继续等待，进度保持 30%
+                    statusBadge.textContent = data.status === 'pending' ? '排队中...' : '处理中...';
+                    statusBadge.className = 'status-badge status-processing';
+                    markProcessing(progressBar);
+                    updateProgressBar(progressBar, 30);
+                }
+            } catch (e) {
+                if (redirectingToLogin) { clearInterval(interval); return; }
+                // 偶发的网络抖动不立刻判死，连续 3 次才停
+                consecutiveErrors += 1;
+                console.error('Polling error', e);
+                if (consecutiveErrors >= 3) {
+                    clearInterval(interval);
+                    makeFailed(statusBadge, itemEl, `进度查询连续失败（已停止轮询）：${e.message}`);
+                }
+            }
+        }, POLL_INTERVAL_MS); // 每2秒轮询一次
+    }
+</script>
+
+</body>
+</html>

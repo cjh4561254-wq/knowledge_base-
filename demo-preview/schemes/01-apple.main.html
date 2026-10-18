@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<!--
+  方案编号：01 ｜ 风格名：Apple 苹果风 ｜ 负责子智能体：Sub-Agent-Apple-UI
+  设计系统要点：
+  1. #F5F5F7 签名浅灰底 + 纯白大圆角卡片(18–24px) + 胶囊按钮(980px)；发布会式超大标题(48–72px)紧字距(-0.02em)、17px 正文/行高 1.5；
+  2. 仅顶栏一层 backdrop-filter: saturate(180%) blur(20px) 半透明白（本机无 GPU，克制使用）；产品式分层阴影 0 12px 32px rgba(0,0,0,.08)；配色仅 #1D1D1F/#0071E3/#6E6E73，禁止花哨渐变；
+  3. 全站动效 300ms cubic-bezier(.4,0,.2,1)：进入淡入+上移 8px、Tab 弹性缩放 scale(.98→1)、hover 上浮 2px；prefers-reduced-motion 全量关闭。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOSS智库知识库 · 方案01 Apple 风</title>
+<style>
+:root{
+  --bg:#F5F5F7; --card:#FFFFFF; --ink:#1D1D1F; --muted:#6E6E73; --faint:#86868B;
+  --blue:#0071E3; --blue-h:#0077ED; --green:#34C759; --amber:#C93400; --red:#D70015;
+  --line:rgba(0,0,0,.08); --shadow:0 12px 32px rgba(0,0,0,.08);
+  --r-card:22px; --r-pill:980px; --ease:cubic-bezier(.4,0,.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  font-size:17px;line-height:1.5;color:var(--ink);background:var(--bg);
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+button{font-family:inherit;cursor:pointer}
+a{color:var(--blue);text-decoration:none}
+:focus-visible{outline:3px solid rgba(0,113,227,.6);outline-offset:2px;border-radius:6px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 22px}
+.card{background:var(--card);border-radius:var(--r-card);box-shadow:var(--shadow)}
+
+/* ---------- 顶栏（唯一毛玻璃层） ---------- */
+.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.72);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:52px;gap:16px}
+.brand{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;color:var(--ink);white-space:nowrap}
+.brand svg{display:block}
+.tabs{display:flex;gap:6px}
+.tab{border:0;background:transparent;color:var(--muted);font-size:14px;padding:7px 18px;border-radius:var(--r-pill);transition:all .3s var(--ease)}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{background:var(--ink);color:#fff}
+.avatar{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:transform .3s var(--ease)}
+.avatar:hover{transform:translateY(-2px)}
+
+/* ---------- Hero ---------- */
+.hero{padding:64px 0 36px;text-align:center}
+.hero h1{font-size:clamp(40px,5.5vw,68px);font-weight:700;letter-spacing:-0.02em;line-height:1.08}
+.hero p{margin-top:14px;font-size:clamp(17px,1.5vw,21px);color:var(--muted);letter-spacing:-0.01em}
+
+/* ---------- 面板通用 ---------- */
+.panel{display:none;padding-bottom:72px}
+.panel.active{display:block;animation:pop .3s var(--ease) both}
+@keyframes pop{from{opacity:0;transform:scale(.98) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.sec-title{font-size:26px;font-weight:700;letter-spacing:-0.02em;margin:8px 0 6px}
+.sec-sub{color:var(--muted);font-size:15px;margin-bottom:18px}
+
+/* ---------- Chat ---------- */
+.chat-shell{padding:0;overflow:hidden}
+.chat-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:16px 24px;border-bottom:1px solid var(--line)}
+.live{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);min-width:0}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none;box-shadow:0 0 0 4px rgba(52,199,89,.16)}
+.chat-tools{display:flex;align-items:center;gap:14px}
+.switch{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer;user-select:none}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.track{width:44px;height:26px;border-radius:13px;background:#D2D2D7;position:relative;transition:background .3s var(--ease);flex:none}
+.track::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.18);transition:transform .3s var(--ease)}
+.switch input:checked + .track{background:var(--green)}
+.switch input:checked + .track::after{transform:translateX(18px)}
+.switch input:focus-visible + .track{outline:3px solid rgba(0,113,227,.6);outline-offset:2px}
+.btn-ghost{border:1px solid var(--line);background:#fff;color:var(--blue);font-size:14px;padding:7px 18px;border-radius:var(--r-pill);transition:all .3s var(--ease)}
+.btn-ghost:hover{background:#F0F6FF;transform:translateY(-2px)}
+.btn-primary{border:0;background:var(--blue);color:#fff;font-size:14px;font-weight:500;padding:9px 22px;border-radius:var(--r-pill);transition:all .3s var(--ease)}
+.btn-primary:hover{background:var(--blue-h);transform:translateY(-2px)}
+.btn-primary:active{transform:translateY(0) scale(.97)}
+
+.chat-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(260px,3fr);gap:0}
+.chat-main{display:flex;flex-direction:column;min-width:0;padding:24px 24px 20px}
+.feed{display:flex;flex-direction:column;gap:22px;overflow-y:auto;max-height:560px;padding-right:8px;scroll-behavior:smooth}
+
+.msg{display:flex;gap:12px;max-width:88%}
+.msg.user{align-self:flex-end;flex-direction:column;align-items:flex-end;gap:4px}
+.bubble{background:var(--blue);color:#fff;font-size:16px;padding:11px 18px;border-radius:20px 20px 6px 20px;box-shadow:0 4px 14px rgba(0,113,227,.22)}
+.time{font-size:12px;color:var(--faint)}
+.avatar-bot{width:38px;height:38px;border-radius:12px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex:none}
+.bot-body{min-width:0}
+.bot-name{font-size:14px;font-weight:600;margin-bottom:6px;color:var(--ink)}
+.answer{font-size:17px;line-height:1.55}
+.answer ol{margin:10px 0 0 22px}
+.answer li{margin:6px 0}
+.answer b{font-weight:600}
+.cite{border:1px solid rgba(0,113,227,.3);background:#EBF3FE;color:var(--blue);font-size:12px;font-weight:600;line-height:1;padding:3px 7px;border-radius:7px;vertical-align:super;margin:0 2px;transition:all .3s var(--ease)}
+.cite:hover{background:var(--blue);color:#fff}
+
+.welcome{background:#F5F5F7;border:1px solid var(--line);border-radius:6px 20px 20px 20px;padding:16px 20px;font-size:16px;color:var(--ink)}
+.welcome small{display:block;margin-top:6px;color:var(--muted);font-size:14px}
+.ask{background:#F5F5F7;border:1px solid var(--line);border-radius:6px 20px 20px 20px;padding:14px 18px;font-size:15px}
+.model-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{border:1px solid rgba(0,113,227,.35);background:#fff;color:var(--blue);font-size:13px;padding:6px 14px;border-radius:var(--r-pill);transition:all .3s var(--ease)}
+.chip:hover{background:var(--blue);color:#fff;transform:translateY(-2px)}
+
+.refs-imgs{display:flex;gap:12px;flex-wrap:wrap}
+.refs-imgs figure{width:110px}
+.refs-imgs .thumb{width:110px;height:78px;border-radius:12px;background:#EBEBED;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--faint);transition:all .3s var(--ease)}
+.refs-imgs .thumb:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.refs-imgs figcaption{font-size:12px;color:var(--muted);text-align:center;margin-top:4px}
+
+.composer{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.composer-row{display:flex;gap:10px;align-items:flex-end}
+.composer textarea{flex:1;resize:vertical;min-height:66px;border:1px solid rgba(0,0,0,.14);border-radius:16px;padding:12px 16px;font-family:inherit;font-size:16px;color:var(--ink);background:#fff;transition:border-color .3s var(--ease)}
+.composer textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px rgba(0,113,227,.12)}
+.send-btn{width:46px;height:46px;border-radius:50%;border:0;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;transition:all .3s var(--ease);flex:none}
+.send-btn:hover{background:var(--blue-h);transform:translateY(-2px)}
+.send-btn:active{transform:scale(.95)}
+.hints{display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--muted)}
+.hints kbd{background:#F5F5F7;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:inherit;font-size:11px;color:var(--muted)}
+
+/* ---------- Chat 右栏 ---------- */
+.chat-side{border-left:1px solid var(--line);background:#FAFAFC;padding:20px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.side-block{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.side-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:0;background:none;text-align:left;padding:13px 15px;font-size:14px;font-weight:600;color:var(--ink)}
+.side-head:hover{background:#F5F5F7}
+.chev{transition:transform .3s var(--ease);flex:none;color:var(--faint)}
+.side-head[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.collapse{display:grid;grid-template-rows:1fr;transition:grid-template-rows .3s var(--ease)}
+.collapse.closed{grid-template-rows:0fr}
+.collapse > .in{overflow:hidden;min-height:0}
+
+.timeline{list-style:none;padding:4px 15px 14px 15px;position:relative}
+.timeline li{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;color:var(--ink);position:relative}
+.timeline li::before{content:"";position:absolute;left:11px;top:-8px;bottom:calc(100% - 4px);width:2px;background:rgba(52,199,89,.35)}
+.timeline li:first-child::before{display:none}
+.node-ic{width:24px;height:24px;border-radius:50%;background:rgba(52,199,89,.14);color:var(--green);display:flex;align-items:center;justify-content:center;flex:none;z-index:1}
+
+.src-flow{display:flex;flex-wrap:wrap;gap:7px;padding:0 15px 12px}
+.src-chip{border:1px solid var(--line);background:#F5F5F7;border-radius:var(--r-pill);font-size:12px;color:var(--ink);padding:5px 12px;display:inline-flex;align-items:center;gap:6px;max-width:100%;transition:all .3s var(--ease)}
+.src-chip i{width:7px;height:7px;border-radius:50%;background:var(--blue);flex:none;font-style:normal}
+.src-chip.wl i{background:#8E8E93}
+.src-chip b{color:var(--blue);font-weight:600}
+.src-chip:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.src-list{list-style:none;padding:0 15px 14px;display:flex;flex-direction:column;gap:8px}
+.src-item{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;background:#fff;transition:all .3s var(--ease)}
+.src-item .t{font-weight:600;font-size:13px;display:block;color:var(--ink);word-break:break-word}
+.tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:var(--r-pill);margin-right:6px;font-weight:500}
+.tag.kb{background:#EAF3FE;color:var(--blue)}
+.tag.wl{background:#F0F0F2;color:var(--muted)}
+.src-meta{color:var(--muted);margin-top:4px;word-break:break-all}
+.rel{color:var(--green);font-weight:600}
+.src-item.flash{background:#EAF3FE;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,.18)}
+
+/* ---------- 导入 ---------- */
+.backend-pill{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:var(--r-pill);padding:7px 18px;font-size:13px;color:var(--muted);box-shadow:var(--shadow)}
+.backend-pill i{width:8px;height:8px;border-radius:50%;background:var(--green);font-style:normal}
+.dropzone{margin:18px 0 22px;border:2px dashed rgba(0,0,0,.16);border-radius:var(--r-card);background:#fff;padding:46px 20px;text-align:center;color:var(--muted);font-size:16px;transition:all .3s var(--ease);cursor:pointer}
+.dropzone:hover,.dropzone.drag{border-color:var(--blue);background:#F5FAFF;transform:translateY(-2px);box-shadow:var(--shadow);color:var(--ink)}
+.dropzone svg{display:block;margin:0 auto 10px;color:var(--blue)}
+.dropzone small{display:block;font-size:13px;color:var(--faint);margin-top:6px}
+
+.file-list{display:flex;flex-direction:column;gap:16px}
+.file-card{padding:18px 20px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;transition:all .3s var(--ease)}
+.file-card:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(0,0,0,.10)}
+.file-ic{width:44px;height:44px;border-radius:12px;background:#FFF1F0;color:#D70015;display:flex;align-items:center;justify-content:center;flex:none;font-size:10px;font-weight:700}
+.file-name{font-size:16px;font-weight:600;letter-spacing:-0.01em;word-break:break-word}
+.file-meta{font-size:13px;color:var(--muted);margin-top:2px}
+.file-links{margin-top:8px;display:flex;gap:16px;font-size:13.5px}
+.bar{height:5px;border-radius:3px;background:#EBEBED;margin-top:9px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--blue);transition:width .35s var(--ease)}
+.bar.done i{background:var(--green)}
+.badge{font-size:12px;font-weight:600;padding:5px 13px;border-radius:var(--r-pill);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.badge i{width:7px;height:7px;border-radius:50%;background:currentColor;font-style:normal}
+.badge.up{background:#EAF3FE;color:var(--blue)}
+.badge.doing{background:#FFF4E5;color:var(--amber)}
+.badge.ok{background:#E9F9EE;color:#1F8A3B}
+.badge.err{background:#FDECEC;color:var(--red)}
+.err-line{margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--red);background:#FDECEC;border-radius:10px;padding:7px 12px}
+
+.log-card{margin-top:22px}
+.log-list{list-style:none;padding:2px 18px 16px}
+.log-list li{display:flex;justify-content:space-between;font-size:13.5px;color:var(--ink);border-bottom:1px solid var(--line);padding:9px 0}
+.log-list li:last-child{border-bottom:0}
+.log-list time{color:var(--muted);font-variant-numeric:tabular-nums}
+
+footer{border-top:1px solid var(--line);padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--muted)}
+
+/* ---------- 响应式 ---------- */
+@media (max-width:1024px){
+  .chat-grid{grid-template-columns:minmax(0,6fr) minmax(240px,4fr)}
+}
+@media (max-width:860px){
+  .chat-grid{grid-template-columns:1fr}
+  .chat-side{border-left:none;border-top:1px solid var(--line)}
+  .feed{max-height:440px}
+  .msg{max-width:96%}
+}
+@media (max-width:640px){
+  .nav-in{height:auto;padding:8px 0;flex-wrap:wrap;justify-content:center}
+  .hero{padding:40px 0 24px}
+  .chat-main{padding:16px 14px}
+  .chat-side{padding:14px}
+  .chat-head{padding:12px 14px}
+  .file-card{grid-template-columns:auto minmax(0,1fr);padding:14px 16px}
+  .file-card .badge{grid-column:2;justify-self:start}
+  .dropzone{padding:34px 14px}
+}
+@media (max-width:390px){
+  body{font-size:16px}
+  .tabs{width:100%;justify-content:center}
+  .live span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
+  .answer{font-size:16px}
+  .refs-imgs figure,.refs-imgs .thumb{width:92px}
+  .refs-imgs .thumb{height:66px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .file-card:hover,.dropzone:hover,.chip:hover,.src-chip:hover,.avatar:hover,.btn-ghost:hover,.btn-primary:hover,.send-btn:hover,.refs-imgs .thumb:hover{transform:none}
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="2" y="3" width="18" height="16" rx="4" fill="#1D1D1F"/><path d="M6 8h10M6 11.5h10M6 15h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+      BOSS智库知识库
+    </div>
+    <nav class="tabs" role="tablist" aria-label="主视图切换">
+      <button class="tab" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="true">知识检索</button>
+      <button class="tab" role="tab" id="tab-import" aria-controls="panel-import" aria-selected="false">文档导入</button>
+    </nav>
+    <button class="avatar" id="avatar" aria-label="账户：张知">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="6" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 15.5c1.4-2.6 3.8-3.8 6-3.8s4.6 1.2 6 3.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="hero wrap">
+    <h1>知识检索，<br>如呼吸般自然。</h1>
+    <p>BOSS智库 · 企业级智能知识库系统 —— 检索、溯源、导入，一体完成。</p>
+  </section>
+
+  <!-- ============ Tab 1 · 知识检索 Chat ============ -->
+  <section class="panel active wrap" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
+    <div class="card chat-shell">
+      <div class="chat-head">
+        <span class="live"><span class="dot" aria-hidden="true"></span><span>在线 · 可查询知识库与联网信息</span></span>
+        <div class="chat-tools">
+          <label class="switch"><input type="checkbox" id="stream-toggle" checked><span class="track" aria-hidden="true"></span>流式输出</label>
+          <button class="btn-ghost" id="clear-btn">清空对话</button>
+        </div>
+      </div>
+
+      <div class="chat-grid">
+        <div class="chat-main">
+          <div class="feed" id="feed" aria-live="polite">
+
+            <div class="msg" id="welcome-block">
+              <div class="avatar-bot"><svg width="20" height="20" viewBox="0 0 22 22" aria-hidden="true"><rect x="2" y="3" width="18" height="16" rx="4" fill="#fff"/><path d="M6 8h10M6 11.5h10M6 15h6" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+              <div class="bot-body">
+                <div class="bot-name">BOSS智库</div>
+                <div class="welcome">你好，我是BOSS智库知识库客服。你可以直接提问，我会在“阶段进度”里展示处理过程。<small>可以问“如何使用万用表测量电压？”</small></div>
+              </div>
+            </div>
+
+            <div class="msg user">
+              <div class="bubble">Coze 工作流实战：商家客服初级里，意图识别节点后分了几条支路？</div>
+              <time class="time" datetime="2026-10-17T20:23">20:23</time>
+            </div>
+
+            <div class="msg">
+              <div class="avatar-bot"><svg width="20" height="20" viewBox="0 0 22 22" aria-hidden="true"><rect x="2" y="3" width="18" height="16" rx="4" fill="#fff"/><path d="M6 8h10M6 11.5h10M6 15h6" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+              <div class="bot-body">
+                <div class="bot-name">BOSS智库</div>
+                <div class="answer">
+                  <p>在《Coze 工作流实战：商家客服初级》案例中，意图识别节点后面一共分了 <b>3 条支路</b>：售前、售后、兜底。<button class="cite" data-ref="2" aria-label="跳转到参考来源 2">2</button><button class="cite" data-ref="3" aria-label="跳转到参考来源 3">3</button><button class="cite" data-ref="5" aria-label="跳转到参考来源 5">5</button></p>
+                  <ol>
+                    <li><b>售前支路</b>：对应意图 <b>branch_0</b>，处理商品、活动、发货咨询，含商品查询（循环校验）与优惠咨询；</li>
+                    <li><b>售后支路</b>：对应意图 <b>branch_1</b>，处理退换货、质量纠纷、退款；</li>
+                    <li><b>兜底支路</b>：对应 <b>default</b>，无法匹配时进入大模型陪聊并挂载插件。</li>
+                  </ol>
+                </div>
+                <div class="refs-imgs" role="group" aria-label="参考图片，共 4 张" style="margin-top:14px">
+                  <figure><div class="thumb"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="3" y="6" width="28" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="14" r="2.6" fill="currentColor"/><path d="M6 25l7-7 5 5 5-6 5 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><figcaption>参考图片</figcaption></figure>
+                  <figure><div class="thumb"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="3" y="6" width="28" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="14" r="2.6" fill="currentColor"/><path d="M6 25l7-7 5 5 5-6 5 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><figcaption>参考图片</figcaption></figure>
+                  <figure><div class="thumb"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="3" y="6" width="28" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="14" r="2.6" fill="currentColor"/><path d="M6 25l7-7 5 5 5-6 5 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><figcaption>参考图片</figcaption></figure>
+                  <figure><div class="thumb"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="3" y="6" width="28" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="14" r="2.6" fill="currentColor"/><path d="M6 25l7-7 5 5 5-6 5 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><figcaption>参考图片</figcaption></figure>
+                </div>
+              </div>
+            </div>
+
+            <div class="msg">
+              <div class="avatar-bot"><svg width="20" height="20" viewBox="0 0 22 22" aria-hidden="true"><rect x="2" y="3" width="18" height="16" rx="4" fill="#fff"/><path d="M6 8h10M6 11.5h10M6 15h6" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+              <div class="bot-body">
+                <div class="bot-name">BOSS智库</div>
+                <div class="ask">您是想问以下哪个产品：HAK180、Hak180、Coze 工作流实战:商家客服初级？请明确一下型号。
+                  <div class="model-chips">
+                    <button class="chip" data-model="HAK180">HAK180</button>
+                    <button class="chip" data-model="Hak180">Hak180</button>
+                    <button class="chip" data-model="Coze 工作流实战:商家客服初级">Coze 工作流实战:商家客服初级</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="composer">
+            <div class="composer-row">
+              <textarea id="input" rows="2" placeholder="请输入问题（Enter 发送，Shift+Enter 换行）" aria-label="提问输入框"></textarea>
+              <button class="send-btn" id="send-btn" aria-label="发送问题">
+                <svg width="19" height="19" viewBox="0 0 19 19" aria-hidden="true"><path d="M3 9.5L16 3l-4.2 13-2.3-5.4L3 9.5z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 10.6L16 3" stroke="#fff" stroke-width="1.6"/></svg>
+              </button>
+            </div>
+            <div class="hints"><span><kbd>Enter</kbd> 发送</span><span><kbd>Shift+Enter</kbd> 换行</span></div>
+          </div>
+        </div>
+
+        <aside class="chat-side" aria-label="阶段进度与参考来源">
+          <section class="side-block">
+            <button class="side-head" id="phase-toggle" aria-expanded="true" aria-controls="phase-body">
+              阶段进度（已完成7，进行中0，状态：已完成）
+              <svg class="chev" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 5.5L7 9.5l4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="collapse" id="phase-body"><div class="in">
+              <ol class="timeline">
+                <li><span class="node-ic"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>确认问题产品</li>
+                <li><span class="node-ic"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>切片搜索</li>
+                <li><span class="node-ic"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>切片搜索(假设性文档)</li>
+                <li><span class="node-ic"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>网络搜索</li>
+                <li><span class="node-ic"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>倒排融合</li>
+                <li><span class="node-ic"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>重排序</li>
+                <li><span class="node-ic"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>生成答案</li>
+              </ol>
+            </div></div>
+          </section>
+
+          <section class="side-block">
+            <button class="side-head" id="src-toggle" aria-expanded="false" aria-controls="src-body">
+              参考来源（8）
+              <svg class="chev" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 5.5L7 9.5l4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="collapse" id="src-body"><div class="in">
+              <div class="src-flow" aria-hidden="true">
+                <span class="src-chip"><i></i><b>[1]</b>&nbsp;意图识别节点配置</span>
+                <span class="src-chip"><i></i><b>[2]</b>&nbsp;支路设计</span>
+                <span class="src-chip"><i></i><b>[3]</b>&nbsp;循环节点</span>
+                <span class="src-chip"><i></i><b>[4]</b>&nbsp;插件挂载</span>
+                <span class="src-chip wl"><i></i><b>[5]</b>&nbsp;火山引擎</span>
+                <span class="src-chip wl"><i></i><b>[6]</b>&nbsp;博客园</span>
+                <span class="src-chip wl"><i></i><b>[7]</b>&nbsp;腾讯云</span>
+                <span class="src-chip wl"><i></i><b>[8]</b>&nbsp;Bilibili</span>
+              </div>
+              <ul class="src-list">
+                <li class="src-item" id="src-1"><span class="t">[1] 《Coze 工作流实战：商家客服初级》· 意图识别节点配置</span><span class="tag kb">知识库</span><span class="src-meta">chunk_id=kb-03-0117 · 相关度 <span class="rel">0.986</span></span></li>
+                <li class="src-item" id="src-2"><span class="t">[2] 《Coze 工作流实战：商家客服初级》· 售前/售后/兜底支路设计</span><span class="tag kb">知识库</span><span class="src-meta">chunk_id=kb-03-0243 · 相关度 <span class="rel">0.981</span></span></li>
+                <li class="src-item" id="src-3"><span class="t">[3] 《Coze 工作流实战：商家客服初级》· 商品查询循环节点</span><span class="tag kb">知识库</span><span class="src-meta">chunk_id=kb-03-0365 · 相关度 <span class="rel">0.974</span></span></li>
+                <li class="src-item" id="src-4"><span class="t">[4] 《Coze 工作流实战：商家客服初级》· 大模型陪聊与插件挂载</span><span class="tag kb">知识库</span><span class="src-meta">chunk_id=kb-03-0492 · 相关度 <span class="rel">0.968</span></span></li>
+                <li class="src-item" id="src-5"><span class="t">[5] Coze 工作流从入门到精通系列3：看工作流如何玩转内容创作与智能客服 - 火山引擎</span><span class="tag wl">联网</span><span class="src-meta">https://developer.volcengine.com/articles/coze-workflow-3 · 相关度 <span class="rel">0.959</span></span></li>
+                <li class="src-item" id="src-6"><span class="t">[6] Coze工作流实战：快速搭建网站的智能客服助手 - 博客园</span><span class="tag wl">联网</span><span class="src-meta">https://www.cnblogs.com/coze-agent-support · 相关度 <span class="rel">0.952</span></span></li>
+                <li class="src-item" id="src-7"><span class="t">[7] 探秘 AI Agent 之 Coze 智能体：工作流模式 - 腾讯云开发者社区</span><span class="tag wl">联网</span><span class="src-meta">https://cloud.tencent.com/developer/article/coze-workflow · 相关度 <span class="rel">0.947</span></span></li>
+                <li class="src-item" id="src-8"><span class="t">[8] 零基础Coze与Dify教程，Agent智能体项目实战 - bilibili</span><span class="tag wl">联网</span><span class="src-meta">https://www.bilibili.com/video/BV1ze-coze-dify · 相关度 <span class="rel">0.941</span></span></li>
+              </ul>
+            </div></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Tab 2 · 文档导入 ============ -->
+  <section class="panel wrap" id="panel-import" role="tabpanel" aria-labelledby="tab-import">
+    <h2 class="sec-title">导入，只剩一步。</h2>
+    <p class="sec-sub">PDF / Markdown 拖进来，解析、切分、向量化全部自动完成。</p>
+    <span class="backend-pill"><i aria-hidden="true"></i>后端接口地址：http://127.0.0.1:8000</span>
+
+    <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="点击或拖拽文件到此处上传（PDF/MD）">
+      <svg width="42" height="42" viewBox="0 0 42 42" aria-hidden="true"><path d="M21 28V10m0 0l-7 7m7-7l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 31v3a3 3 0 0 0 3 3h20a3 3 0 0 0 3-3v-3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      点击或拖拽文件到此处 (PDF/MD)
+      <small>单个文件 ≤ 50 MB · 演示环境将模拟上传进度</small>
+    </div>
+
+    <div class="file-list" id="file-list">
+
+      <article class="card file-card">
+        <div class="file-ic" aria-hidden="true">PDF</div>
+        <div>
+          <div class="file-name">03-商家客服初级.pdf</div>
+          <div class="file-meta">1.7 MB · 完成于 08:42 · 4 个节点 · 378.67s</div>
+          <div class="bar done"><i style="width:100%"></i></div>
+          <div class="file-links"><span>切片数：<b>17</b></span><a href="#panel-import" onclick="return false">查看Markdown</a><a href="#panel-import" onclick="return false">下载Markdown</a></div>
+        </div>
+        <span class="badge ok"><i></i>已完成</span>
+      </article>
+
+      <article class="card file-card">
+        <div class="file-ic" aria-hidden="true">PDF</div>
+        <div>
+          <div class="file-name">sample.pdf</div>
+          <div class="file-meta">0.7 KB · 完成于 08:37 · 3 个节点 · 12.04s</div>
+          <div class="bar done"><i style="width:100%"></i></div>
+          <div class="file-links"><span>切片数：<b>1</b></span><a href="#panel-import" onclick="return false">查看Markdown</a></div>
+        </div>
+        <span class="badge ok"><i></i>已完成</span>
+      </article>
+
+      <article class="card file-card">
+        <div class="file-ic" aria-hidden="true">PDF</div>
+        <div>
+          <div class="file-name">损坏文件.pdf</div>
+          <div class="file-meta">2.3 MB · 中止于 08:31 · 1 个节点 · 2.11s</div>
+          <div class="bar"><i style="width:12%"></i></div>
+          <div class="err-line">
+            <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><path d="M7.5 1.5L14 13.5H1L7.5 1.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.5 6v3.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7.5" cy="11.4" r=".9" fill="currentColor"/></svg>
+            PDF 加密或无法解析，已中止导入
+          </div>
+        </div>
+        <span class="badge err"><i></i>失败</span>
+      </article>
+
+    </div>
+
+    <section class="card log-card">
+      <button class="side-head" id="log-toggle" aria-expanded="false" aria-controls="log-body">
+        节点执行日志 · 03-商家客服初级.pdf
+        <svg class="chev" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 5.5L7 9.5l4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="collapse closed" id="log-body"><div class="in">
+        <ul class="log-list">
+          <li>检查文件 <time>0.42s</time></li>
+          <li>PDF转Markdown <time>33.59s</time></li>
+          <li>Markdown图片处理 <time>943.98s</time></li>
+          <li>文档切分 <time>1.87s</time></li>
+          <li>主体名称识别 <time>18.24s</time></li>
+          <li>向量生成 <time>72.58s</time></li>
+          <li>导入向量库 <time>5.39s</time></li>
+          <li>处理完成 <time>08:42</time></li>
+        </ul>
+      </div></div>
+    </section>
+  </section>
+</main>
+
+<footer>© 2026 BOSS智库 · 企业级智能知识库系统</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------- Tab 切换（弹性缩放由 .panel.active 动画承担） ---------- */
+  var tabs = [$("tab-chat"), $("tab-import")];
+  var panels = { "tab-chat":"panel-chat", "tab-import":"panel-import" };
+  tabs.forEach(function(tab){
+    tab.addEventListener("click", function(){
+      tabs.forEach(function(t){ t.setAttribute("aria-selected", String(t===tab)); });
+      Object.keys(panels).forEach(function(k){
+        var el = $(panels[k]);
+        el.classList.toggle("active", k===tab.id);
+      });
+    });
+    tab.addEventListener("keydown", function(e){
+      if(e.key==="ArrowRight"||e.key==="ArrowLeft"){
+        var i = tabs.indexOf(tab), n = tabs[(i+(e.key==="ArrowRight"?1:tabs.length-1))%tabs.length];
+        n.focus(); n.click();
+      }
+    });
+  });
+
+  /* ---------- 折叠面板通用 ---------- */
+  function bindCollapse(btnId, bodyId){
+    var btn = $(btnId), body = $(bodyId);
+    btn.addEventListener("click", function(){
+      var open = btn.getAttribute("aria-expanded")==="true";
+      btn.setAttribute("aria-expanded", String(!open));
+      body.classList.toggle("closed", open);
+    });
+    return { btn:btn, body:body };
+  }
+  var phase = bindCollapse("phase-toggle","phase-body");
+  var src   = bindCollapse("src-toggle","src-body");
+  bindCollapse("log-toggle","log-body");
+  src.btn.setAttribute("aria-expanded","true"); /* 来源默认展开为列表+chips */
+  src.body.classList.remove("closed");
+
+  /* ---------- 引用角标 → 滚动定位并高亮对应来源 ---------- */
+  var flashTimer = null;
+  document.addEventListener("click", function(e){
+    var cite = e.target.closest && e.target.closest(".cite");
+    if(!cite) return;
+    src.btn.setAttribute("aria-expanded","true"); src.body.classList.remove("closed");
+    var target = $("src-"+cite.getAttribute("data-ref"));
+    if(!target) return;
+    target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block:"center" });
+    document.querySelectorAll(".src-item.flash").forEach(function(x){ x.classList.remove("flash"); });
+    target.classList.add("flash");
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(function(){ target.classList.remove("flash"); }, 2200);
+  });
+
+  /* ---------- 型号候选 chips → 填入输入框 ---------- */
+  document.addEventListener("click", function(e){
+    var chip = e.target.closest && e.target.closest(".chip[data-model]");
+    if(!chip) return;
+    var box = $("input");
+    box.value = "我想了解「" + chip.getAttribute("data-model") + "」的相关信息";
+    box.focus();
+  });
+
+  /* ---------- Chat：发送 + 模拟流式吐字（受流式输出开关控制） ---------- */
+  var feed = $("feed");
+  var initialFeed = feed.innerHTML;
+  var toggle = $("stream-toggle");
+  var avatarSVG = '<svg width="20" height="20" viewBox="0 0 22 22" aria-hidden="true"><rect x="2" y="3" width="18" height="16" rx="4" fill="#fff"/><path d="M6 8h10M6 11.5h10M6 15h6" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  var canned = "在《Coze 工作流实战：商家客服初级》案例中，意图识别节点后分了 3 条支路：售前（branch_0，商品/活动/发货咨询）、售后（branch_1，退换货/质量纠纷/退款）、兜底（default，大模型陪聊并挂载插件）。详见参考来源 [2]。";
+  var busy = false;
+
+  function now(){ var d=new Date(); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
+  function scrollFeed(){ feed.scrollTop = feed.scrollHeight; }
+  function esc(s){ var d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+  function send(){
+    var box = $("input"), text = box.value.trim();
+    if(!text || busy) return;
+    box.value = ""; busy = true;
+
+    var u = document.createElement("div"); u.className = "msg user";
+    u.innerHTML = '<div class="bubble">'+esc(text)+'</div><time class="time">'+now()+'</time>';
+    feed.appendChild(u); scrollFeed();
+
+    setTimeout(function(){
+      var b = document.createElement("div"); b.className = "msg";
+      b.innerHTML = '<div class="avatar-bot">'+avatarSVG+'</div><div class="bot-body"><div class="bot-name">BOSS智库</div><div class="answer"><p></p></div></div>';
+      feed.appendChild(b);
+      var p = b.querySelector("p");
+      if(toggle.checked && !reduce){
+        var i = 0;
+        (function tick(){
+          i = Math.min(i+3, canned.length);
+          p.textContent = canned.slice(0, i);
+          scrollFeed();
+          if(i < canned.length){ setTimeout(tick, 45); } else { busy = false; }
+        })();
+      }else{
+        p.textContent = canned; scrollFeed(); busy = false;
+      }
+    }, reduce ? 60 : 420);
+  }
+  $("send-btn").addEventListener("click", send);
+  $("input").addEventListener("keydown", function(e){
+    if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }
+  });
+
+  /* ---------- 清空对话 ---------- */
+  $("clear-btn").addEventListener("click", function(){
+    if(busy) return;
+    feed.innerHTML = initialFeed;
+    feed.scrollTop = 0;
+  });
+
+  /* ---------- 导入：点击/拖拽 → 模拟 上传中→处理中→已完成 ---------- */
+  var dz = $("dropzone"), list = $("file-list"), seq = 0;
+  var nodeNames = ["检查文件","PDF转Markdown","Markdown图片处理","文档切分","主体名称识别","向量生成","导入向量库","处理完成"];
+  function addUpload(name){
+    seq += 1;
+    var art = document.createElement("article");
+    art.className = "card file-card";
+    art.innerHTML =
+      '<div class="file-ic" aria-hidden="true">PDF</div><div>'+
+      '<div class="file-name"></div>'+
+      '<div class="file-meta">'+ (0.8+seq*0.1).toFixed(1) +' MB · 模拟演示上传</div>'+
+      '<div class="bar"><i style="width:0%"></i></div>'+
+      '<div class="file-links stage"><span>正在排队…</span></div></div>'+
+      '<span class="badge up"><i></i>上传中</span>';
+    art.querySelector(".file-name").textContent = name || ("演示文档-"+seq+".pdf");
+    list.insertBefore(art, list.firstChild);
+    var bar = art.querySelector(".bar i"), badge = art.querySelector(".badge");
+    var stage = art.querySelector(".stage"), pct = 0, processing = false;
+    var timer = setInterval(function(){
+      pct += reduce ? 34 : 4 + Math.floor(Math.random()*5);
+      if(!processing && pct >= 55){
+        processing = true;
+        badge.className = "badge doing"; badge.innerHTML = "<i></i>处理中";
+        stage.innerHTML = "<span>节点进行中："+ nodeNames[Math.min(1, nodeNames.length-1)] +"…</span>";
+      }
+      if(pct >= 100){
+        clearInterval(timer);
+        bar.parentElement.classList.add("done"); bar.style.width = "100%";
+        badge.className = "badge ok"; badge.innerHTML = "<i></i>已完成";
+        stage.innerHTML = "<span>切片数：<b>"+(2+seq%4)+"</b></span><a href=\"#panel-import\" onclick=\"return false\">查看Markdown</a><a href=\"#panel-import\" onclick=\"return false\">下载Markdown</a>";
+        return;
+      }
+      bar.style.width = pct + "%";
+      if(!processing) stage.innerHTML = "<span>上传中 "+ pct +"%</span>";
+      else stage.innerHTML = "<span>节点进行中："+ nodeNames[Math.min(2+(pct-55)/9|0, 7)] +"… "+ pct +"%</span>";
+    }, reduce ? 120 : 180);
+  }
+  dz.addEventListener("click", function(){ addUpload(); });
+  dz.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); addUpload(); } });
+  ["dragenter","dragover"].forEach(function(ev){
+    dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add("drag"); });
+  });
+  ["dragleave","drop"].forEach(function(ev){
+    dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.remove("drag"); });
+  });
+  dz.addEventListener("drop", function(e){
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    addUpload(f ? f.name : null);
+  });
+})();
+</script>
+</body>
+</html>

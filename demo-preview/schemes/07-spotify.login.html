@@ -1,0 +1,452 @@
+<!--
+  方案编号：07
+  风格名：Spotify 流媒体沉浸霓虹风（登录页 Demo）
+  负责子智能体：Sub-Agent-Spotify-Neon
+  设计系统要点：
+    1) 纯黑沉浸底 #000 → 卡片 #181818 / hover #282828，文字 #FFFFFF / #B3B3B3，唯一强调色荧光绿 #1DB954（CTA、focus、高亮描边）；
+    2) 字重极端对比：标题 900 / 32–40px / letter-spacing -0.02em（Circular 不可用 → 系统栈重字重），正文与标签 13–14px #B3B3B3；
+    3) 背景只用静态 radial/linear 渐变 + 一道斜向绿色高光（无 backdrop-filter 大 blur、无持续动画，兼容无 GPU 本机预览）。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · BOSS智库知识库（Spotify 流媒体沉浸霓虹风）</title>
+<style>
+  :root{
+    --bg:#000000; --panel:#121212; --card:#181818; --card-hover:#282828; --card-bright:#333333;
+    --t1:#FFFFFF; --t2:#B3B3B3; --t3:#7A7A7A;
+    --green:#1DB954; --green-bright:#1ED760; --err:#F04E41; --err-t:#FF8A80;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue","Microsoft YaHei",sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{height:100%;margin:0;padding:0}
+  body{
+    background:var(--bg);color:var(--t1);font-family:var(--font);font-size:14px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;display:flex;align-items:center;justify-content:center;
+    padding:28px 20px;position:relative;overflow-x:hidden;
+  }
+  /* 静态背景视觉：深黑 + 顶部深蓝渐变页头观感 + 一道斜向绿色高光（无 blur / 无动画） */
+  .bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(680px 340px at 8% 6%, rgba(30,50,100,.9), rgba(18,18,18,0) 68%),
+      radial-gradient(720px 420px at 92% 96%, rgba(29,185,84,.18), rgba(29,185,84,0) 66%),
+      linear-gradient(160deg,#0C1428 0%,#050505 46%,#000 100%);
+  }
+  .bg::after{content:"";position:absolute;left:-6%;top:58%;width:112%;height:2px;transform:rotate(-9deg);
+    background:linear-gradient(90deg,rgba(30,215,96,0),rgba(30,215,96,.55) 38%,rgba(29,185,84,.16) 62%,rgba(29,185,84,0));
+  }
+  .eq{position:fixed;left:24px;bottom:22px;z-index:0;opacity:.5;display:flex;align-items:flex-end;gap:5px;height:56px;pointer-events:none}
+  .eq i{display:block;width:5px;border-radius:3px;background:linear-gradient(180deg,var(--green-bright),rgba(29,185,84,.25))}
+
+  .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  a{color:var(--t2);text-decoration:none}
+  a:hover{color:var(--t1);text-decoration:underline}
+  button{font-family:inherit;cursor:pointer}
+  :focus-visible{outline:3px solid var(--green-bright);outline-offset:3px;border-radius:4px}
+
+  .shell{position:relative;z-index:1;width:100%;max-width:1040px;display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:center}
+
+  /* ---------- 品牌区 ---------- */
+  .brand{padding:8px 4px}
+  .logo{display:flex;align-items:center;gap:12px}
+  .logo h1{margin:0;font-size:20px;font-weight:900;letter-spacing:-.03em}
+  .logo h1 em{font-style:normal;color:var(--t2);font-weight:700}
+  .tagline{margin:26px 0 0;font-size:clamp(30px,4.2vw,40px);font-weight:900;letter-spacing:-.03em;line-height:1.06}
+  .tagline span{color:var(--green-bright)}
+  .sub{margin:14px 0 0;font-size:14px;color:var(--t2);max-width:40ch}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+  .stat{background:rgba(24,24,24,.86);border:1px solid #232323;border-radius:8px;padding:12px 16px;min-width:132px}
+  .stat b{display:block;font-size:22px;font-weight:900;letter-spacing:-.02em}
+  .stat i{font-style:normal;font-size:11px;font-weight:800;color:var(--t2);letter-spacing:.06em;text-transform:uppercase}
+  .stat.is-green{border-color:rgba(29,185,84,.5);background:rgba(29,185,84,.10)}
+  .stat.is-green b{color:var(--green-bright)}
+  .foot-line{margin-top:30px;font-size:12px;color:var(--t3);font-weight:700}
+
+  /* ---------- 表单卡 ---------- */
+  .card{
+    background:var(--card);border:1px solid #262626;border-radius:10px;
+    padding:32px 30px 26px;box-shadow:0 24px 48px rgba(0,0,0,.6);
+  }
+  .card-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .chip-live{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:var(--green-bright);
+    border:1px solid rgba(29,185,84,.42);background:rgba(29,185,84,.10);border-radius:999px;padding:4px 10px;letter-spacing:.04em}
+  .chip-live .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(29,185,84,.2)}
+  .card h2{font-size:30px;font-weight:900;letter-spacing:-.03em;margin:14px 0 6px;line-height:1.1}
+  .card .lead{font-size:13px;color:var(--t2);margin:0 0 20px}
+
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);margin-bottom:8px}
+  .input-wrap{position:relative}
+  .input{
+    width:100%;background:#0D0D0D;border:1px solid #3a3a3a;border-radius:8px;color:var(--t1);
+    padding:14px 16px;font-size:15px;font-weight:600;transition:border-color .16s ease,background-color .16s ease;
+  }
+  .input::placeholder{color:#6d6d6d;font-weight:500}
+  .input:hover{border-color:#5a5a5a}
+  .input:focus{outline:none;border-color:var(--green);background:#0F1512}
+  .input:focus-visible{outline:3px solid rgba(30,215,96,.45);outline-offset:2px}
+  .field.is-error .input{border-color:var(--err);background:#140607}
+  .field.is-error .input:focus{border-color:var(--err)}
+  .msg{display:none;align-items:center;gap:7px;margin-top:8px;font-size:12px;font-weight:800;color:var(--err-t)}
+  .field.is-error .msg{display:flex}
+  .pw-toggle{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;
+    background:transparent;border:0;color:var(--t2);display:grid;place-items:center;transition:color .15s ease,background-color .15s ease;
+  }
+  .pw-toggle:hover{color:var(--t1);background:var(--card-hover)}
+  .has-pw .input{padding-right:52px}
+
+  .banner{
+    display:flex;gap:10px;align-items:flex-start;background:rgba(240,78,65,.10);
+    border:1px solid #6E2A2D;border-radius:8px;padding:11px 13px;margin-bottom:18px;
+  }
+  .banner svg{flex:0 0 auto;margin-top:1px}
+  .banner p{margin:0;font-size:12.5px;font-weight:800;color:var(--err-t);letter-spacing:-.01em}
+  .banner small{display:block;font-weight:600;color:#D9A7A3;margin-top:3px;font-size:11px}
+
+  .row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 22px}
+  .remember{display:inline-flex;align-items:center;gap:9px;font-size:12px;font-weight:700;color:var(--t2);cursor:pointer}
+  .remember input{position:absolute;opacity:0;width:0;height:0}
+  .box{width:18px;height:18px;border-radius:4px;border:2px solid #5a5a5a;display:grid;place-items:center;background:#0D0D0D;transition:background-color .15s ease,border-color .15s ease}
+  .box svg{opacity:0;transition:opacity .14s ease}
+  .remember input:checked + .box{background:var(--green);border-color:var(--green)}
+  .remember input:checked + .box svg{opacity:1}
+  .remember input:focus-visible + .box{outline:3px solid var(--green-bright);outline-offset:2px}
+  .remember:hover{color:var(--t1)}
+  .forgot{margin-left:auto;font-size:12px;font-weight:800;color:var(--t2);border-bottom:1px solid transparent}
+  .forgot:hover{color:var(--green-bright);text-decoration:none;border-bottom-color:var(--green-bright)}
+
+  .cta{
+    display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+    background:var(--green);color:#000;border:0;border-radius:999px;padding:15px 22px;
+    font-size:15px;font-weight:900;letter-spacing:-.01em;
+    transition:background-color .16s ease,transform .16s ease,opacity .16s ease;
+  }
+  .cta:hover{background:var(--green-bright);transform:scale(1.04)}
+  .cta:active{transform:scale(.99)}
+  .cta:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  .cta[disabled]{background:var(--card-bright);color:var(--t3);cursor:not-allowed;transform:none}
+  .cta[aria-busy="true"]{background:#179348;color:#0A2B17;cursor:progress;transform:none}
+  .spin{width:15px;height:15px;border-radius:50%;border:2px solid rgba(0,0,0,.25);border-top-color:#000;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .cta-note{margin:10px 0 0;font-size:11px;color:var(--t3);font-weight:700;text-align:center}
+
+  .split{display:flex;align-items:center;gap:14px;margin:24px 0 16px}
+  .split i{flex:1 1 auto;height:1px;background:#2e2e2e}
+  .split span{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--t3);white-space:nowrap}
+  .oauth{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .oauth button{
+    display:grid;place-items:center;gap:6px;background:#0D0D0D;border:1px solid #333;border-radius:8px;
+    padding:12px 6px;color:var(--t2);transition:color .15s ease,background-color .15s ease,border-color .15s ease,transform .15s ease;
+  }
+  .oauth button:hover{color:var(--t1);background:var(--card-hover);border-color:#5a5a5a;transform:translateY(-2px)}
+  .oauth button:focus-visible{border-color:var(--green)}
+  .oauth .nm{font-size:11px;font-weight:800}
+  .oauth-hint{margin:12px 0 0;font-size:11px;color:var(--t3);text-align:center;font-weight:700;min-height:16px}
+  .oauth-hint.is-on{color:var(--green-bright)}
+  .copyright{margin:22px 0 0;text-align:center;font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.01em}
+
+  @media (max-width:1024px){
+    .shell{grid-template-columns:1fr;gap:28px;max-width:520px}
+    .brand{padding:0}
+    .tagline{font-size:32px}
+    .stats{margin-top:20px}
+    .eq{display:none}
+  }
+  @media (max-width:768px){
+    body{padding:20px 14px;align-items:flex-start}
+    .shell{gap:22px}
+    .card{padding:24px 20px 20px;border-radius:8px}
+    .card h2{font-size:26px}
+    .stat{min-width:112px;padding:10px 12px}
+    .stat b{font-size:18px}
+    .tagline{font-size:27px}
+    .sub{font-size:13px}
+  }
+  @media (max-width:390px){
+    .logo h1{font-size:17px}
+    .tagline{font-size:23px}
+    .card{padding:20px 16px 18px}
+    .card h2{font-size:22px}
+    .row{gap:10px}
+    .forgot{margin-left:0}
+    .oauth{grid-template-columns:repeat(2,1fr)}
+    .cta{padding:14px 18px;font-size:14px}
+    .stats{gap:8px}
+    .stat{flex:1 1 40%;min-width:0}
+    .foot-line{margin-top:20px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition-duration:.01ms !important;animation:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+<div class="eq" aria-hidden="true">
+  <i style="height:26%"></i><i style="height:52%"></i><i style="height:34%"></i><i style="height:78%"></i>
+  <i style="height:44%"></i><i style="height:96%"></i><i style="height:60%"></i><i style="height:30%"></i>
+  <i style="height:72%"></i><i style="height:48%"></i><i style="height:88%"></i><i style="height:38%"></i>
+</div>
+
+<main class="shell">
+  <!-- 品牌区 -->
+  <section class="brand" aria-label="品牌与状态">
+    <div class="logo">
+      <svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="16" fill="#1DB954"/>
+        <path d="M8.4 12.6c5-1.5 10.4-1.1 15 1.1M9.6 16.6c4.2-1.2 8.5-.9 12.2 1.1M10.8 20.4c3.4-.9 6.7-.6 9.6.9"
+              stroke="#000" stroke-width="2.1" stroke-linecap="round" fill="none"/>
+      </svg>
+      <h1>BOSS智库<em>知识库</em></h1>
+    </div>
+    <p class="tagline">把每一次提问，<br>变成一段<span>不间断</span>的答案流。</p>
+    <p class="sub">企业级智能知识库系统 · 知识库检索与联网信息合并重排，7 个检索节点全程可见。</p>
+    <div class="stats">
+      <div class="stat is-green"><b>69</b><i>切片总量</i></div>
+      <div class="stat"><b>7</b><i>检索节点</i></div>
+      <div class="stat"><b>0.9214</b><i>最高相关度</i></div>
+    </div>
+    <p class="foot-line">在线 · 可查询知识库与联网信息 · 后端接口 http://127.0.0.1:8000</p>
+  </section>
+
+  <!-- 登录卡 -->
+  <section class="card" aria-labelledby="title">
+    <div class="card-head">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="none" stroke="#333" stroke-width="2"/><path d="M10.5 13c3.6-1.1 7.4-.8 11 .9M11.4 16.6c3-.9 6-.6 8.7.9" stroke="#1DB954" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      <span class="chip-live"><span class="dot" aria-hidden="true"></span>服务在线</span>
+    </div>
+    <h2 id="title">登录</h2>
+    <p class="lead">继续你的知识库检索会话，队列与引用记录都会保留。</p>
+
+    <!-- 静态错误态展示（上一次登录失败的既有状态） -->
+    <div class="banner" role="alert">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF8A80" stroke-width="2.2" aria-hidden="true" stroke-linecap="round">
+        <circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".6" fill="#FF8A80" stroke="none"/>
+      </svg>
+      <p>用户名或密码错误<small>请检查账号后重试，或改用企业微信 / 钉钉 / 飞书 账号登录。</small></p>
+    </div>
+
+    <form id="form" novalidate>
+      <div class="field is-error" id="fAccount">
+        <label for="account">账号</label>
+        <div class="input-wrap">
+          <input class="input" id="account" name="account" type="text" value="zhang.think@boss.cn"
+                 placeholder="手机号 / 邮箱 / 用户名" autocomplete="username"
+                 aria-describedby="errAccount" aria-invalid="true">
+        </div>
+        <p class="msg" id="errAccount">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1l7 13H1z"/></svg>
+          <span data-msg>用户名或密码错误</span>
+        </p>
+      </div>
+
+      <div class="field" id="fPwd">
+        <label for="password">密码</label>
+        <div class="input-wrap has-pw">
+          <input class="input" id="password" name="password" type="password" value="Boss@2026"
+                 placeholder="请输入密码" autocomplete="current-password"
+                 aria-describedby="errPwd" >
+          <button class="pw-toggle" id="pwToggle" type="button" aria-label="显示密码" aria-pressed="false">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" id="eyeIcon">
+              <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>
+            </svg>
+          </button>
+        </div>
+        <p class="msg" id="errPwd">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1l7 13H1z"/></svg>
+          <span data-msg>请输入密码</span>
+        </p>
+      </div>
+
+      <div class="row">
+        <label class="remember">
+          <input type="checkbox" id="remember" checked>
+          <span class="box" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="#000" stroke-width="2.6"><path d="M3 8.5l3.4 3.4L13 5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          记住我
+        </label>
+        <a class="forgot" href="#forgot" id="forgot">忘记密码？</a>
+      </div>
+
+      <button class="cta" type="submit" id="submit">
+        <span id="submitLabel">登录</span>
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" id="submitIcon"><path d="M2 7.2h9.2M8 3.4l3.8 3.8L8 11" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <p class="cta-note">演示环境：不会发起任何真实网络请求</p>
+
+      <p class="msg" id="forgotTip" style="display:none;margin-top:14px;align-items:flex-start">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style="margin-top:2px"><path d="M8 1l7 13H1z"/></svg>
+        <span data-msg>请联系知识库管理员重置密码（Demo 占位文案）。</span>
+      </p>
+
+      <div class="split"><i></i><span>或使用企业账号登录</span><i></i></div>
+
+      <div class="oauth">
+        <button type="button" class="oauth-btn" data-name="企业微信" aria-label="使用企业微信账号登录">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M9.5 4C5.4 4 2 6.7 2 10.1c0 1.9 1.1 3.6 2.8 4.7L4 17.6l2.9-1.4c.8.2 1.6.4 2.6.4"/>
+            <path d="M15 8.6c3.3 0 6 2.3 6 5.2 0 1.6-.9 3-2.3 3.9l.5 2.3-2.3-1.2c-.6.2-1.3.2-1.9.2-3.3 0-6-2.3-6-5.2s2.7-5.4 6-5.4z"/>
+            <circle cx="12.8" cy="13.4" r=".7" fill="currentColor" stroke="none"/><circle cx="17.2" cy="13.4" r=".7" fill="currentColor" stroke="none"/>
+          </svg>
+          <span class="nm">企业微信</span>
+        </button>
+        <button type="button" class="oauth-btn" data-name="钉钉" aria-label="使用钉钉账号登录">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M12 2.6 4.6 12.4h4.2l-1 5.6 6-8.2h-4z" stroke-linejoin="round"/>
+            <path d="M20.2 8.2c-1.4-1.4-3.2-2.2-5.2-2.4M21.4 13.6c-1 1.6-2.6 2.8-4.4 3.3"/>
+            <path d="M3.4 18.6h9" stroke-linecap="round"/>
+          </svg>
+          <span class="nm">钉钉</span>
+        </button>
+        <button type="button" class="oauth-btn" data-name="飞书" aria-label="使用飞书账号登录">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 14.5c4.6 1.8 9.4.6 13-3.4-3.6 5.2-8.6 7.4-14 5.6z" stroke-linejoin="round"/>
+            <path d="M6.4 9.6C9.8 8 13.4 6.2 16.2 3.6c1.9 3.2 1.7 6.6-.4 9.6" stroke-linejoin="round"/>
+            <path d="M4 19.4c1.6-1.2 3.4-2 5.4-2.4" stroke-linecap="round"/>
+          </svg>
+          <span class="nm">飞书</span>
+        </button>
+        <button type="button" class="oauth-btn" data-name="GitHub" aria-label="使用 GitHub 账号登录">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M12 2.4c5.4 0 9.6 4.2 9.6 9.6 0 4.4-2.8 8-6.8 9.2-.5-.1-.7-.4-.7-.8v-1.8c2.6.5 3.3-1.5 3.3-1.5.5-1.2-.5-2.3-.5-2.3-1.5-.9.2-1.4.2-1.4 1.8-.2 2 1.6 2 1.6 1.2 2.2-1 1.4-1.4 1.2-.4-.6.8-1.4.8-2.6-.1-1.4-3-2.6-4.4-2.4-1.6.2-3.4 1.4-3.4 3.6 0 .8.4 1.6 1 2.2-.2.6-.6 1.6.2 2.6 0 0-1.4-.4-1.8-1.4-.2-.4-1-.4-1.4-.2 0 0-.6.2-.4.6.2.6 1.4.8 1.4.8-.6.4-.8 1.2-.8 1.8-3.6-1.4-6-4.4-6-8.4 0-5.4 4-9.6 9-9.6z"/>
+          </svg>
+          <span class="nm">GitHub</span>
+        </button>
+      </div>
+      <p class="oauth-hint" id="oauthHint" role="status" aria-live="polite">第三方登录在正式环境接入统一身份源</p>
+
+      <p class="copyright">© 2026 BOSS智库 · 企业级智能知识库系统</p>
+    </form>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var d = document;
+  function $(s) { return d.querySelector(s); }
+
+  var form = $('#form'), account = $('#account'), password = $('#password');
+  var fAccount = $('#fAccount'), fPwd = $('#fPwd');
+  var submit = $('#submit'), submitLabel = $('#submitLabel'), submitIcon = $('#submitIcon');
+  var banner = $('.banner'), bannerText = $('.banner p');
+  var busy = false;
+
+  function setErr(field, input, text) {
+    if (!field) return;
+    if (text) {
+      field.classList.add('is-error');
+      if (input) { input.setAttribute('aria-invalid', 'true'); }
+      var m = $('[data-msg]', field);
+      if (m) m.textContent = text;
+    } else {
+      field.classList.remove('is-error');
+      if (input) { input.removeAttribute('aria-invalid'); }
+    }
+  }
+
+  /* 记住我：本地偏好（file:// 或受限 iframe 下静默降级，不产生控制台报错） */
+  var remember = $('#remember');
+  var KEY = 'boss_demo_remember';
+  try {
+    var saved = window.localStorage ? window.localStorage.getItem(KEY) : null;
+    if (saved === '0') { remember.checked = false; }
+    if (saved === '1') { remember.checked = true; }
+  } catch (e) { /* 忽略：无存储权限时保持默认勾选 */ }
+  remember.addEventListener('change', function () {
+    try { if (window.localStorage) window.localStorage.setItem(KEY, remember.checked ? '1' : '0'); }
+    catch (e) { /* 忽略 */ }
+    bannerText.innerHTML = remember.checked
+      ? '已勾选“记住我”<small>下次打开将保留账号：zhang.think@boss.cn（Demo 模拟）。</small>'
+      : '已取消“记住我”<small>关闭浏览器后需要重新输入账号。</small>';
+  });
+
+  /* 密码显示 / 隐藏 */
+  var pwToggle = $('#pwToggle'), eyeIcon = $('#eyeIcon');
+  var EYE = '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>';
+  var EYE_OFF = '<path d="M4 4l16 16"/><path d="M9.6 5.4A10 10 0 0 1 22 12c-.7 1.3-1.9 2.7-3.4 3.7"/><path d="M6.2 7.6C3.8 9 2 12 2 12s3.6 6 10 6c1.5 0 2.9-.3 4.1-.9"/>';
+  pwToggle.addEventListener('click', function () {
+    var show = password.type === 'password';
+    password.type = show ? 'text' : 'password';
+    pwToggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+    pwToggle.setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+    eyeIcon.innerHTML = show ? EYE_OFF : EYE;
+    password.focus();
+  });
+
+  /* 空值 → 按钮 disabled 态；有值 → 恢复 */
+  function syncEnabled() {
+    var empty = !account.value.trim() || !password.value.trim();
+    submit.disabled = empty && !busy;
+    submitLabel.textContent = busy ? '正在验证…' : (empty ? '登录（需填写账号与密码）' : '登录');
+  }
+  [account, password].forEach(function (el) {
+    el.addEventListener('input', function () {
+      setErr(el === account ? fAccount : fPwd, el, '');
+      if (banner) { banner.style.display = 'none'; }
+      syncEnabled();
+    });
+  });
+  syncEnabled();
+
+  /* 提交：校验 + loading（纯模拟，不发请求） */
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (busy) return;
+    var bad = null;
+    if (!account.value.trim()) { setErr(fAccount, account, '请输入账号（手机号 / 邮箱 / 用户名）'); bad = account; }
+    else { setErr(fAccount, account, ''); }
+    if (!password.value.trim()) { setErr(fPwd, password, '请输入密码'); bad = bad || password; }
+    else { setErr(fPwd, password, ''); }
+    if (bad) { banner.style.display = 'none'; bad.focus(); return; }
+
+    busy = true;
+    submit.setAttribute('aria-busy', 'true');
+    submit.disabled = true;
+    submitLabel.textContent = '正在验证…';
+    if (submitIcon) submitIcon.style.display = 'none';
+    var sp = d.createElement('span');
+    sp.className = 'spin';
+    sp.setAttribute('aria-hidden', 'true');
+    submit.appendChild(sp);
+    banner.style.display = 'none';
+
+    setTimeout(function () {
+      busy = false;
+      submit.removeAttribute('aria-busy');
+      submit.disabled = false;
+      if (sp.parentNode) sp.parentNode.removeChild(sp);
+      if (submitIcon) submitIcon.style.display = '';
+      syncEnabled();
+      // Demo 固定判定为失败，用于静态展示错误态
+      banner.style.display = '';
+      bannerText.innerHTML = '用户名或密码错误<small>请检查账号后重试，或改用企业微信 / 钉钉 / 飞书 账号登录。</small>';
+      setErr(fAccount, account, '用户名或密码错误');
+      account.setAttribute('aria-invalid', 'true');
+      account.focus();
+    }, 1400);
+  });
+
+  /* 忘记密码：静态提示 */
+  var forgot = $('#forgot'), forgotTip = $('#forgotTip');
+  forgot.addEventListener('click', function (e) {
+    e.preventDefault();
+    var on = forgotTip.style.display === 'block';
+    forgotTip.style.display = on ? 'none' : 'flex';
+    forgot.setAttribute('aria-expanded', on ? 'false' : 'true');
+  });
+
+  /* 第三方登录：仅给反馈，不联网 */
+  var hint = $('#oauthHint');
+  Array.prototype.forEach.call(d.querySelectorAll('.oauth-btn'), function (b) {
+    b.addEventListener('click', function () {
+      hint.textContent = b.getAttribute('data-name') + ' 登录入口仅为视觉演示（离线 Demo，不跳转）。';
+      hint.classList.add('is-on');
+    });
+  });
+})();
+</script>
+</body>
+</html>

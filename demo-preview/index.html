@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>前端方案预览画廊 · 10 套大厂风格 Demo</title>
+<style>
+  :root{
+    --bg:#0E1116; --surface:#161B22; --surface2:#1C222B; --line:#2A323D;
+    --text:#E8EDF3; --muted:#95A2B2; --accent:#4DA3FF; --ok:#3EF7A0; --warn:#FFB84D;
+    --bad:#FF6B6B; --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+  a{color:var(--accent)}
+  button{font:inherit;cursor:pointer}
+  .wrap{max-width:1760px;margin:0 auto;padding:16px 20px 120px}
+
+  header.top{position:sticky;top:0;z-index:40;background:rgba(14,17,22,.94);border-bottom:1px solid var(--line);
+    padding:12px 20px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+  header.top h1{font-size:16px;margin:0 8px 0 0;letter-spacing:.01em}
+  header.top .sub{color:var(--muted);font-size:12px}
+  .seg{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .seg button{background:transparent;color:var(--muted);border:0;padding:6px 14px;font-size:13px}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:#06101D;font-weight:600}
+  .seg button:focus-visible{outline:2px solid #fff;outline-offset:-2px}
+  .switch{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+  .switch input{accent-color:var(--accent);width:15px;height:15px}
+  .kbd{font-family:ui-monospace,Consolas,monospace;font-size:11px;border:1px solid var(--line);border-radius:4px;
+    padding:1px 5px;background:var(--surface2);color:var(--muted)}
+
+  .count{margin:16px 0 10px;display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+  .count b{font-size:20px}
+  .count .note{color:var(--muted);font-size:12px}
+
+  /* 画廊：10 格同屏平铺 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(392px,1fr));gap:18px}
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+    display:flex;flex-direction:column}
+  .tile-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);
+    background:var(--surface2)}
+  .num{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:var(--accent);color:#06101D;
+    border-radius:5px;padding:1px 6px;font-weight:700}
+  .sname{font-weight:600;font-size:14px}
+  .agents{margin-left:auto;color:var(--muted);font-size:11px;text-align:right;max-width:150px}
+  .shot{position:relative;height:250px;background:#fff;overflow:hidden}
+  .shot .framebox{position:absolute;top:0;left:0;width:1440px;height:900px;transform:scale(.272);transform-origin:top left;border:0}
+  .shot iframe{width:1440px;height:900px;border:0;display:block;background:#fff}
+  .shot .veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,17,22,0) 60%,rgba(14,17,22,.35));
+    border:0;padding:0;width:auto;height:auto;cursor:zoom-in}
+  .shot .veil:hover{background:rgba(77,163,255,.10);box-shadow:inset 0 0 0 2px var(--accent)}
+  .shot .veil span{position:absolute;right:10px;bottom:10px;background:rgba(6,16,29,.82);color:#fff;font-size:12px;
+    padding:4px 9px;border-radius:6px}
+  .tokens{padding:10px 12px;font-size:12px;color:var(--muted);flex:1}
+  .tokens ul{margin:0;padding-left:16px}
+  .tokens li{margin:2px 0}
+  .tile-foot{display:flex;gap:8px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface2)}
+  .btn{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:7px;padding:6px 11px;font-size:13px}
+  .btn:hover{border-color:var(--accent)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn.pick{background:var(--accent);color:#06101D;border-color:var(--accent);font-weight:600}
+  .btn.pick.alt{background:#2E3B4C;color:#DCE6F2;border-color:#3C4C61}
+  .btn[data-chosen="A"]{background:var(--ok);border-color:var(--ok);color:#04291B;font-weight:700}
+  .btn[data-chosen="B"]{background:var(--warn);border-color:var(--warn);color:#2A1C00;font-weight:700}
+  .chk{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;margin-left:auto}
+  .badge{font-family:ui-monospace,Consolas,monospace;font-size:11px;border-radius:5px;padding:1px 6px;border:1px solid var(--line);color:var(--muted)}
+  .badge.ok{color:var(--ok);border-color:rgba(62,247,160,.35)}
+  .badge.bad{color:var(--bad);border-color:rgba(255,107,107,.4)}
+
+  /* 底部选择条 */
+  .dock{position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(22,27,34,.97);border-top:1px solid var(--line);
+    padding:10px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .dock .lbl{font-size:12px;color:var(--muted)}
+  .dock code{font-family:ui-monospace,Consolas,monospace;background:var(--surface2);border:1px solid var(--line);
+    border-radius:6px;padding:5px 9px;font-size:13px;color:#fff}
+  #diag{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+  #diag .badge{cursor:default}
+
+  /* 全屏模态 */
+  .modal{position:fixed;inset:0;z-index:60;background:rgba(6,9,13,.92);display:none;flex-direction:column}
+  .modal.open{display:flex}
+  .mbar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .mbody{flex:1;position:relative;background:#fff}
+  .mbody iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+  .cmp{flex:1;display:none;gap:2px;background:var(--line)}
+  .cmp.on{display:flex}
+  .cmp .half{flex:1;position:relative;background:#fff}
+  .cmp .half iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .cmp .half .tag{position:absolute;left:0;top:0;background:rgba(6,16,29,.85);color:#fff;font-size:12px;padding:3px 8px;z-index:2}
+
+  .empty{padding:22px;color:var(--muted)}
+  @media (max-width:520px){
+    .grid{grid-template-columns:1fr}
+    .shot{height:210px}
+    .shot .framebox,.shot iframe{transform:scale(.24)}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>前端方案预览画廊</h1>
+  <span class="sub">10 套大厂风格 · 每套含【主页面】+【登录页】 · 内容逐字一致，只有视觉不同</span>
+
+  <div class="seg" role="group" aria-label="视图切换">
+    <button id="vMain" aria-pressed="true">主页面 (M)</button>
+    <button id="vLogin" aria-pressed="false">登录界面 (L)</button>
+  </div>
+
+  <label class="switch"><input type="checkbox" id="motionToggle" checked> 缩略格关闭动效（10 格同屏更稳，本机无 GPU 加速）</label>
+  <label class="switch"><input type="checkbox" id="cmpToggle"> 对比模式（A/B 两套并排）</label>
+  <button class="btn" id="btnAudit">运行时体检</button>
+  <button class="btn" id="btnHard" title="子智能体改过文件后浏览器可能仍在用缓存副本，这个按钮强制各 iframe 重新拉取">硬刷新全部预览</button>
+  <button class="btn" id="btnRevealImp" title="部分方案把导入模块放在 Tab 或折叠里，缩略格看不到">露出导入模块</button>
+  <button class="btn" id="btnRevealChat" title="恢复各方案默认的对话视图">回到对话模块</button>
+
+  <span class="sub"><span class="kbd">1</span>–<span class="kbd">0</span> 选方案 · <span class="kbd">←</span><span class="kbd">→</span> 相邻 · <span class="kbd">Enter</span> 全屏 · <span class="kbd">Esc</span> 关闭</span>
+</header>
+
+<div class="wrap">
+  <div class="count">
+    <b id="cntTxt">10 套方案</b>
+    <span class="note" id="curView">当前视图：主页面</span>
+    <span class="note">每格都是<b>真实运行</b>的独立页面（非截图）。点任意一格可全屏细看，或直接在这屏横向对比。</span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="hint" hidden></div>
+</div>
+
+<div class="dock">
+  <span class="lbl">你的选择 →</span>
+  <code id="sentence">（还没选。点任意方案的「选它」按钮，或直接回复我「我选择第 X 套方案」）</code>
+  <button class="btn" id="btnCopy">复制这句话</button>
+  <button class="btn" id="btnClearPick">清除选择</button>
+  <button class="btn" id="btnCmpOpen">并排看 A/B</button>
+  <div id="diag" aria-live="polite"></div>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="方案全屏预览">
+  <div class="mbar">
+    <button class="btn" id="mPrev">← 上一套</button>
+    <span class="num" id="mNum">01</span>
+    <span class="sname" id="mName"></span>
+    <span class="sub" id="mAgents" style="color:var(--muted);font-size:12px"></span>
+    <div class="seg" role="group" aria-label="视图切换" style="margin-left:12px">
+      <button id="mMain" aria-pressed="true">主页面</button>
+      <button id="mLogin" aria-pressed="false">登录界面</button>
+    </div>
+    <button class="btn pick" id="mPickA" style="margin-left:auto">选它 (A)</button>
+    <button class="btn pick alt" id="mPickB">结合 (B)</button>
+    <button class="btn" id="mOpen">新标签打开</button>
+    <button class="btn" id="mNext">下一套 →</button>
+    <button class="btn" id="mClose">关闭 (Esc)</button>
+  </div>
+  <div class="mbody" id="mBody"><iframe id="mFrame" title="方案全屏预览"></iframe></div>
+  <div class="cmp" id="mCmp">
+    <div class="half"><span class="tag" id="tagA"></span><iframe id="cmpA" title="方案 A 对比"></iframe></div>
+    <div class="half"><span class="tag" id="tagB"></span><iframe id="cmpB" title="方案 B 对比"></iframe></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var SCHEMES = [
+    {n:"01",slug:"01-apple",name:"Apple 苹果风",agents:"Apple-UI（主页面）/ Apple-Motion（登录页）",
+     tokens:["#F5F5F7 底 + 22px 大圆角 + 980px 胶囊按钮","顶栏单层毛玻璃 saturate(180%) blur(20px)","17px 正文、68px 发布会式大标题、弹性缩放动效"]},
+    {n:"02",slug:"02-google",name:"Google Material You",agents:"Google-MD3（两套全包）",
+     tokens:["MD3 baseline purple 色调板 #6750A4/#EADDFF","全胶囊按钮 + 12/16px 卡片形状层级","点击涟漪 ripple + 8% state layer + tonal surface 分层"]},
+    {n:"03",slug:"03-ms",name:"Microsoft Fluent",agents:"MS-Layout（主页面）/ MS-Acrylic（登录页）",
+     tokens:["Acrylic 亚克力仅用于顶栏/登录卡一处","Reveal Highlight 光标跟随边框高光（rAF 节流）","4/8px 微圆角 + 8px 网格 + CommandBar/Persona/DetailsList"]},
+    {n:"04",slug:"04-linear",name:"Linear / Vercel 极客暗黑",agents:"Linear-Dark（主页面）/ Vercel-Glow（登录页）",
+     tokens:["#0A0A0A 深黑 + 1px 上亮下暗渐变描边","⌘K 命令面板 + 密集 <kbd> 快捷键标签","三栏：窄导航 / 主区 / Inspector；等宽数字与 ID"]},
+    {n:"05",slug:"05-stripe",name:"Stripe 流体渐变",agents:"Stripe-Mesh（主页面）/ Stripe-Form（登录页）",
+     tokens:["纯 CSS 多层 radial mesh（静态、零 blur）","clip-path 斜切分区 + 三层柔和阴影","Checkout 式表单：floating label 轻回弹 + ring 过渡"]},
+    {n:"06",slug:"06-airbnb",name:"Airbnb 温暖人文",agents:"Airbnb-Card（两套全包）",
+     tokens:["Rausch #FF5A5F 单点强调 + 22px 大圆角","listing 大图卡片网格，静止无阴影 / hover 抬升","宽松行高、圆形图标按钮、亲和型信息架构"]},
+    {n:"07",slug:"07-spotify",name:"Spotify 沉浸霓虹",agents:"Spotify-Neon（两套全包）",
+     tokens:["纯黑四阶 #000/#121212/#181818/#282828","荧光绿 #1DB954 只给 CTA 与激活态","700–900 重字重 + 底部播放条式会话控件"]},
+    {n:"08",slug:"08-notion",name:"Notion 极简纸张",agents:"Notion-Block（两套全包）",
+     tokens:["#37352F 暖黑 + #F7F6F3 米白侧栏，几乎无投影","块语言：拖拽手柄 / Callout / Toggle / Table / Todo","900px 文档宽度 + 斜杠命令浮层"]},
+    {n:"09",slug:"09-tesla",name:"Tesla 工业 HUD",agents:"Tesla-HUD（主页面）/ Tesla-Control（登录页）",
+     tokens:["纯黑 + 金属灰 + 冷调青蓝 #4DA3FF，2px 直角","SVG 环形仪表 + 车机横条控制面板 + 电池分段进度","大写间距标签与等宽数字；长按连接式解锁"]},
+    {n:"10",slug:"10-enterprise",name:"Amazon 高转化企业风",agents:"Enterprise-UX（两套全包）",
+     tokens:["深蓝 #0F4C81 信任色 + 橙黄 #F59E0B 高转化 CTA","指标看板 / 对照表 / 星级相关度 / 信任徽章条","高密度多列网格但层级严格对齐"]}
+  ];
+  var VIEWS = {main:"main", login:"login"};
+  var state = {view:"main", focus:0, pickA:null, pickB:null, motion:true};
+  try{ var saved = JSON.parse(localStorage.getItem("kb_demo_choice")||"null");
+       if(saved){ state.pickA=saved.A||null; state.pickB=saved.B||null; state.view=saved.view||"main"; } }catch(e){}
+
+  function path(s,v){ return "schemes/"+s.slug+"."+v+".html"; }
+  function el(t,a,c){ var e=document.createElement(t); if(a)for(var k in a) e.setAttribute(k,a[k]); if(c)e.className=c; return e; }
+  var grid = document.getElementById("grid");
+
+  function build(){
+    grid.innerHTML="";
+    document.getElementById("cntTxt").textContent = SCHEMES.length+" 套方案（同屏平铺，可一眼数完）";
+    SCHEMES.forEach(function(s,i){
+      var tile = el("div",{"class":"tile","data-idx":i});
+      var head = el("div",{"class":"tile-head"});
+      head.appendChild(el("span",{"class":"num"},null)).textContent = s.n;
+      head.appendChild(el("span",{"class":"sname"},null)).textContent = s.name;
+      head.appendChild(el("span",{"class":"agents"},null)).textContent = s.agents;
+      tile.appendChild(head);
+
+      var shot = el("div",{"class":"shot"});
+      var box = el("div",{"class":"framebox"});
+      var f = el("iframe",{"src":path(s,state.view),"title":"方案 "+s.n+" "+s.name+" 预览","data-role":"thumb","scrolling":"no"});
+      box.appendChild(f); shot.appendChild(box);
+      var veil = el("button",{"class":"veil","aria-label":"全屏预览方案 "+s.n+" "+s.name});
+      veil.appendChild(document.createElement("span")).textContent="全屏预览 ⤢";
+      veil.addEventListener("click",function(){ openModal(i); });
+      shot.appendChild(veil); tile.appendChild(shot);
+
+      var tk = el("div",{"class":"tokens"});
+      var ul = el("ul"); s.tokens.forEach(function(t){ ul.appendChild(el("li")).textContent=t; });
+      tk.appendChild(ul); tile.appendChild(tk);
+
+      var foot = el("div",{"class":"tile-foot"});
+      var pa = el("button",{"class":"btn pick"},"btn pick");
+      pa.textContent="选它"; pa.dataset.role="pickA"; pa.dataset.idx=i;
+      var pb = el("button",{"class":"btn pick alt"},"btn pick alt");
+      pb.textContent="结合"; pb.dataset.role="pickB"; pb.dataset.idx=i;
+      var op = el("a",{"class":"btn","href":path(s,state.view),"target":"_blank","rel":"noopener"},"btn");
+      op.textContent="原文件";
+      var chk = el("span",{"class":"chk","data-role":"chk"}); chk.textContent="体检：待运行";
+      foot.appendChild(pa); foot.appendChild(pb); foot.appendChild(op); foot.appendChild(chk);
+      tile.appendChild(foot);
+      grid.appendChild(tile);
+    });
+    paintPicks();
+    if(!state.motion) killMotion(); else restoreMotion();
+  }
+
+  /* 缩略格关动效：同源时向 iframe 文档注入一条 style（file:// 下跨源会失败，try/catch 兜住） */
+  function injectQuiet(doc, quiet){
+    try{
+      var id = "demo-quiet";
+      var old = doc.getElementById(id);
+      if(quiet){ if(!old){ var st=doc.createElement("style"); st.id=id;
+        st.textContent="*,*::before,*::after{animation:none!important;transition:none!important}html{scroll-behavior:auto}";
+        doc.head.appendChild(st);} }
+      else if(old){ old.remove(); }
+    }catch(e){ return false; }
+    return true;
+  }
+  function eachFrame(fn){ Array.prototype.forEach.call(document.querySelectorAll('iframe[data-role="thumb"]'),function(f){
+    try{ if(f.contentDocument && f.contentDocument.readyState==="complete") fn(f.contentDocument,f); }catch(e){}
+  }); }
+  function killMotion(){ state.motion=false; eachFrame(function(d){ injectQuiet(d,true); }); }
+  function restoreMotion(){ state.motion=true; eachFrame(function(d){ injectQuiet(d,false); }); }
+  grid.addEventListener("load",function(){},true);
+  document.addEventListener("DOMContentLoaded",function(){});
+
+  /* 体检：只断言 DOM 里真实存在的东西，不拿 textContent 猜属性值 */
+  var PROBES = [
+    {key:"品牌/标题", test:function(d){ return /BOSS智库/.test(d.body.textContent); }},
+    {key:"阶段进度",  test:function(d){ return /阶段进度/.test(d.body.textContent); }},
+    {key:"参考来源",  test:function(d){ return /参考来源/.test(d.body.textContent); }},
+    {key:"引用角标",  test:function(d){ return !!d.querySelector("sup,[class*=cite],[data-src-index]"); }},
+    {key:"后端地址",  test:function(d){ return /127\.0\.0\.1:8000/.test(d.body.textContent); }},
+    {key:"交互元素",  test:function(d){ return d.querySelectorAll("button,input,a,[role]").length>=6; }}
+  ];
+  var LOGIN_PROBES = [
+    {key:"账号输入",  test:function(d){ return !!d.querySelector('input[type="text"],input[type="email"],input[name*=user],input[id*=user],input[placeholder]'); }},
+    {key:"密码输入",  test:function(d){ return !!d.querySelector('input[type="password"]'); }},
+    {key:"记住我",    test:function(d){ return /记住/.test(d.body.textContent); }},
+    {key:"忘记密码",  test:function(d){ return /忘记密码/.test(d.body.textContent); }},
+    {key:"第三方登录",test:function(d){ return d.querySelectorAll('[aria-label]').length>=3; }},
+    {key:"错误态文案",test:function(d){ return /错误|失败|不正确/.test(d.body.textContent); }},
+    {key:"版权行",    test:function(d){ return /©|2026/.test(d.body.textContent); }}
+  ];
+  function runAudit(){
+    var diag = document.getElementById("diag"); diag.innerHTML="";
+    var passTiles=0, failedNames=[];
+    Array.prototype.forEach.call(grid.querySelectorAll(".tile"),function(tile,i){
+      var f = tile.querySelector('iframe[data-role="thumb"]');
+      var out = tile.querySelector('[data-role="chk"]');
+      var s = SCHEMES[i];
+      var doc=null, ok=false, miss=[];
+      try{ doc = f.contentDocument; }catch(e){ miss.push("跨源(用 file:// 打开时无法体检，请用下方 HTTP 地址)"); }
+      if(doc && doc.body && doc.readyState==="complete"){
+        var list = state.view==="login" ? LOGIN_PROBES : PROBES;
+        list.forEach(function(p){ try{ if(!p.test(doc)) miss.push(p.key); }catch(e){ miss.push(p.key+"(异常)"); } });
+        var html = doc.documentElement;
+        var w = doc.documentElement.clientWidth || 1280;
+        if(html.scrollWidth > w+2) miss.push("横向溢出 "+html.scrollWidth+">"+w);
+        ok = miss.length===0;
+        if(ok) passTiles++; else failedNames.push(s.n);
+        out.innerHTML="";
+        var b = el("span",{"class":"badge "+(ok?"ok":"bad")});
+        b.textContent = ok ? "体检通过 "+PROBES.length+"/"+PROBES.length+" 项" : "待人工确认：" + miss.join("、");
+        out.appendChild(b);
+      } else {
+        out.innerHTML=""; var b2=el("span",{"class":"badge"}); b2.textContent = doc? ("加载中…("+ (doc?doc.readyState:"") +")") : "无法访问文档";
+        out.appendChild(b2); failedNames.push(s.n);
+      }
+    });
+    var sum = el("span",{"class":"badge "+(failedNames.length?"bad":"ok")});
+    sum.textContent = "画廊体检："+passTiles+"/10 通过"+(failedNames.length?"｜待确认 "+failedNames.join(","):"");
+    diag.insertBefore(sum, diag.firstChild);
+  }
+
+  /* 选择条 */
+  function label(i){ return "第 "+SCHEMES[i].n+" 套方案（"+SCHEMES[i].slug+" · "+SCHEMES[i].name+"）"; }
+  function sentence(){
+    if(state.pickA===null && state.pickB===null) return "（还没选。点任意方案的「选它」按钮，或直接回复我「我选择第 X 套方案」）";
+    if(state.pickA!==null && state.pickB===null) return "我选择"+label(state.pickA)+"，按这套重构我的真实前端。";
+    if(state.pickA===null && state.pickB!==null) return "我选择"+label(state.pickB)+"，按这套重构我的真实前端。";
+    return "我选择"+label(state.pickA)+"为主，并结合"+label(state.pickB)+"的（我会在补充说明里写清结合哪部分）。";
+  }
+  function paintPicks(){
+    document.getElementById("sentence").textContent = sentence();
+    Array.prototype.forEach.call(grid.querySelectorAll('[data-role^="pick"]'),function(b){
+      var i = +b.dataset.idx;
+      b.removeAttribute("data-chosen");
+      if(b.dataset.role==="pickA") b.textContent = (state.pickA===i? "✓ 已选 A" : "选它");
+      if(b.dataset.role==="pickB") b.textContent = (state.pickB===i? "✓ 已选 B" : "结合");
+      if(state.pickA===i) b.setAttribute("data-chosen","A");
+      if(state.pickB===i) b.setAttribute("data-chosen","B");
+    });
+    try{ localStorage.setItem("kb_demo_choice", JSON.stringify({A:state.pickA,B:state.pickB,view:state.view})); }catch(e){}
+    if(modalOpen){ var i=state.focus;
+      mPickA.setAttribute("data-chosen", state.pickA===i?"A":""); if(state.pickA!==i) mPickA.removeAttribute("data-chosen");
+      mPickA.textContent = state.pickA===i? "✓ 已选 A" : "选它 (A)";
+      mPickB.textContent = state.pickB===i? "✓ 已选 B" : "结合 (B)";
+      if(state.pickB!==i) mPickB.removeAttribute("data-chosen"); else mPickB.setAttribute("data-chosen","B");
+    }
+  }
+  grid.addEventListener("click",function(ev){
+    var b = ev.target.closest ? ev.target.closest('[data-role^="pick"]') : null;
+    if(!b) return;
+    var i = +b.dataset.idx;
+    if(b.dataset.role==="pickA") state.pickA = (state.pickA===i? null : i);
+    else state.pickB = (state.pickB===i? null : i);
+    paintPicks();
+  });
+
+  /* 视图切换（整屏一起换） */
+  function setView(v){
+    state.view=v;
+    document.getElementById("curView").textContent = "当前视图：" + (v==="login"?"登录界面":"主页面");
+    document.getElementById("vMain").setAttribute("aria-pressed", v==="main");
+    document.getElementById("vLogin").setAttribute("aria-pressed", v==="login");
+    Array.prototype.forEach.call(grid.querySelectorAll('iframe[data-role="thumb"]'),function(f,i){
+      f.src = path(SCHEMES[i],v);
+    });
+    document.getElementById("diag").innerHTML="";
+    paintPicks();
+  }
+  document.getElementById("vMain").addEventListener("click",function(){ setView("main"); });
+  document.getElementById("vLogin").addEventListener("click",function(){ setView("login"); });
+  document.getElementById("motionToggle").addEventListener("change",function(e){
+    if(e.target.checked) restoreMotion(); else killMotion();
+  });
+  document.getElementById("btnAudit").addEventListener("click", runAudit);
+  document.getElementById("btnHard").addEventListener("click",function(){
+    var n=0;
+    Array.prototype.forEach.call(grid.querySelectorAll('iframe[data-role="thumb"]'),function(f){
+      try{ f.contentWindow.location.reload(); n++; }catch(e){}
+    });
+    try{ if(modalOpen) mFrame.contentWindow.location.reload(); }catch(e){}
+    var diag=document.getElementById("diag");
+    var b=el("span",{"class":"badge ok"}); b.textContent="已强制重载 "+n+"/10 个预览（避开缓存），2 秒后再跑体检";
+    diag.insertBefore(b, diag.firstChild);
+    setTimeout(function(){ revealModules(true); setTimeout(runAudit,600); },2000);
+  });
+  document.getElementById("btnClearPick").addEventListener("click",function(){ state.pickA=null; state.pickB=null; paintPicks(); });
+  document.getElementById("btnCopy").addEventListener("click",function(ev){
+    var t = sentence();
+    function done(ok){ var b=ev.currentTarget; var old=b.textContent; b.textContent = ok? "已复制 ✓" : "复制失败，请手动选中"; setTimeout(function(){ b.textContent=old; },1600); }
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(function(){done(true);},function(){done(false);}); }
+    else { try{ var ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select();
+            var okc=document.execCommand("copy"); ta.remove(); done(!!okc);}catch(e){ done(false);} }
+  });
+
+  /* 全屏模态 */
+  var modal=document.getElementById("modal"), mFrame=document.getElementById("mFrame"), modalOpen=false;
+  var mNum=document.getElementById("mNum"), mName=document.getElementById("mName"), mAgents=document.getElementById("mAgents");
+  var mPickA=document.getElementById("mPickA"), mPickB=document.getElementById("mPickB");
+  var cmp=document.getElementById("mCmp"), mBody=document.getElementById("mBody");
+  function openModal(i){
+    state.focus=i; var s=SCHEMES[i];
+    mNum.textContent=s.n; mName.textContent=s.name; mAgents.textContent=s.agents;
+    mFrame.src = path(s,state.view);
+    document.getElementById("mMain").setAttribute("aria-pressed", state.view==="main");
+    document.getElementById("mLogin").setAttribute("aria-pressed", state.view==="login");
+    if(document.getElementById("cmpToggle").checked && state.pickA!==null && state.pickB!==null){ syncCmp(); }
+    modal.classList.add("open"); modalOpen=true; paintPicks();
+    document.getElementById("mClose").focus();
+  }
+  function closeModal(){ modal.classList.remove("open"); modalOpen=false; mFrame.src="about:blank"; }
+  function step(d){ var i=(state.focus+d+SCHEMES.length)%SCHEMES.length; openModal(i); }
+  document.getElementById("mClose").addEventListener("click",closeModal);
+  document.getElementById("mPrev").addEventListener("click",function(){ step(-1); });
+  document.getElementById("mNext").addEventListener("click",function(){ step(1); });
+  document.getElementById("mOpen").addEventListener("click",function(){ window.open(path(SCHEMES[state.focus],state.view),"_blank","noopener"); });
+  mPickA.addEventListener("click",function(){ state.pickA = state.pickA===state.focus? null: state.focus; paintPicks(); });
+  mPickB.addEventListener("click",function(){ state.pickB = state.pickB===state.focus? null: state.focus; paintPicks(); });
+  document.getElementById("mMain").addEventListener("click",function(){ setView("main"); if(modalOpen) mFrame.src=path(SCHEMES[state.focus],"main"); });
+  document.getElementById("mLogin").addEventListener("click",function(){ setView("login"); if(modalOpen) mFrame.src=path(SCHEMES[state.focus],"login"); });
+
+  function syncCmp(){
+    var A=state.pickA, B=state.pickB;
+    document.getElementById("tagA").textContent = A===null?"（未选 A）": SCHEMES[A].n+" "+SCHEMES[A].name;
+    document.getElementById("tagB").textContent = B===null?"（未选 B）": SCHEMES[B].n+" "+SCHEMES[B].name;
+    document.getElementById("cmpA").src = A===null? "about:blank" : path(SCHEMES[A],state.view);
+    document.getElementById("cmpB").src = B===null? "about:blank" : path(SCHEMES[B],state.view);
+  }
+  document.getElementById("cmpToggle").addEventListener("change",function(e){
+    var on=e.target.checked;
+    cmp.classList.toggle("on",on); mBody.style.display = on? "none":"block";
+    if(on) syncCmp(); else { document.getElementById("cmpA").src="about:blank"; document.getElementById("cmpB").src="about:blank"; }
+  });
+  document.getElementById("btnCmpOpen").addEventListener("click",function(){
+    if(state.pickA===null||state.pickB===null){ alert("请先分别点一个「选它 (A)」和一个「结合 (B)」再对比。"); return; }
+    document.getElementById("cmpToggle").checked=true;
+    cmp.classList.add("on"); mBody.style.display="none"; syncCmp(); openModal(state.pickA);
+  });
+
+  document.addEventListener("keydown",function(ev){
+    if(ev.target.matches && ev.target.matches("input,textarea")) return;
+    var k=ev.key;
+    if(k==="Escape"){ if(modalOpen) closeModal(); return; }
+    if(k==="ArrowRight"){ if(modalOpen) step(1); return; }
+    if(k==="ArrowLeft"){ if(modalOpen) step(-1); return; }
+    if(k==="m"||k==="M"){ setView("main"); if(modalOpen) mFrame.src=path(SCHEMES[state.focus],"main"); return; }
+    if(k==="l"||k==="L"){ setView("login"); if(modalOpen) mFrame.src=path(SCHEMES[state.focus],"login"); return; }
+    if(modalOpen && k==="Enter"){ window.open(path(SCHEMES[state.focus],state.view),"_blank","noopener"); return; }
+    if(/^[0-9]$/.test(k)){ var i = k==="0"? 9 : (+k-1); if(i<SCHEMES.length) openModal(i); }
+  });
+
+  /* 把各方案默认藏在 Tab / <details> 里的模块露出来（同源 HTTP 下可直接操作 iframe 文档） */
+  /* 关键串必须"只存在于导入视图正文"，否则会泄漏在常驻三栏骨架里导致探针短路（不再点 Tab 就判定已露出） */
+  var IMP_KEYS = ["点击或拖拽文件到此处","节点执行日志","切片数","PDF转Markdown"];
+  var CHAT_KEYS = ["如何使用万用表测量电压","参考来源","阶段进度","确认问题产品"];
+  function revealModules(wantImport){
+    var ok=0, noBtn=0, lines=[];
+    Array.prototype.forEach.call(grid.querySelectorAll('iframe[data-role="thumb"]'),function(f,i){
+      var s=SCHEMES[i], note="";
+      try{
+        var d=f.contentDocument;
+        if(!d||!d.body){ note="无访问权"; noBtn++; }
+        else{
+          Array.prototype.forEach.call(d.querySelectorAll("details"),function(x){ x.open=true; });
+          var rx = wantImport? /导入|上传|文档|PDF/ : /对话|检索|问答|知识|Chat/;
+          var sel = 'button,[role="tab"],a,nav *,[class*="tab"] *,label,input[type="radio"]';
+          var cands=[];
+          Array.prototype.forEach.call(d.querySelectorAll(sel),function(el){
+            var t=(el.textContent||"").trim();
+            var al=(el.getAttribute&&el.getAttribute("aria-label")||"").trim();
+            var ti=(el.getAttribute&&el.getAttribute("title")||"").trim();
+            /* 图标式 Tab 的文字可能为空、名称在 aria-label/title 里，必须一起匹配 */
+            var name = t.length&&t.length<=14 ? t : (al.length&&al.length<=20 ? al : (ti.length&&ti.length<=20 ? ti : ""));
+            if(!name) return;
+            if(!rx.test(name)) return;
+            if(el.tagName==="A" && el.getAttribute("href")) return;   // 别把页面点没了
+            el.__demoName = name;
+            if(cands.indexOf(el)<0) cands.push(el);
+          });
+          /* 贪心：逐个试点，可见关键数变多才保留，变少就再点一次还原（无脑全开会误关已展开的面板） */
+          function visCount(doc){
+            var txt=(doc.body&&doc.body.innerText||"").replace(/\s+/g," ");
+            return (wantImport?IMP_KEYS:CHAT_KEYS).filter(function(k){ return txt.indexOf(k)>=0; }).length;
+          }
+          var hit=null, label="", best=visCount(d);
+          Array.prototype.forEach.call(d.querySelectorAll("details"),function(x){ if(!x.open){ x.open=true; } });
+          var after=visCount(d); if(after<best){ /* details 不会误关，保留 */ } else { best=Math.max(best,after); }
+          /* 排序：名字里直接含"导入/文档"的先试，避免被顶栏图标按钮挤在前 6 个之外 */
+          cands.sort(function(a,b){
+            function score(el){ var n=(el.__demoName||el.textContent||"")+(el.getAttribute("aria-label")||"");
+              return /导入/.test(n)?0:(/文档|上传|PDF/.test(n)?1:2); }
+            return score(a)-score(b);
+          });
+          var vis0=visCount(d);
+          if(vis0>=(wantImport?IMP_KEYS.length:CHAT_KEYS.length)){ hit="already"; }
+          var actList=cands.slice(0,12);
+          Array.prototype.forEach.call(d.querySelectorAll('[aria-expanded="false"]'),function(x){ actList.push(x); });
+          /* 有些方案的日志/进度用没有 aria-expanded 的自定义折叠按钮，也纳入试点（变差会被还原） */
+          Array.prototype.forEach.call(d.querySelectorAll('button[class*="coll"],button[class*="expand"],button[class*="accordion"],button[class*="log"],button[class*="head"],.coll-head,.collapse-btn'),function(x){
+            if(actList.indexOf(x)<0) actList.push(x);
+          });
+          Array.prototype.forEach.call(actList,function(node){
+            if(hit==="max"||hit==="already") return;
+            var before=visCount(d);
+            try{ node.click(); }catch(e){ return; }
+            Array.prototype.forEach.call(d.querySelectorAll("details"),function(x){ x.open=true; });
+            Array.prototype.forEach.call(d.querySelectorAll('[aria-expanded="false"]'),function(x){ try{ x.click(); }catch(e){} });
+            var now=visCount(d);
+            if(now>before){
+              best=Math.max(best,now);
+              var nm=(node.__demoName||node.textContent||"").trim().slice(0,10);
+              if(nm) { label = label? label : nm; }
+              hit=node;
+              if(now>=(wantImport?IMP_KEYS.length:CHAT_KEYS.length)) hit="max";
+            } else if(now<before){
+              try{ node.click(); }catch(e){}   // 还原
+            }
+          });
+          if(hit==="max"){ note="已全部露出"; }
+          else if(hit==="already"){ note="本来就已全部露出"; }
+          else if(hit){ note="点开「"+(label||(hit.__demoName||hit.textContent||"").trim().slice(0,10))+"」"; }
+          else { note="没找到入口"; noBtn++; }
+          var txt=(d.body&&d.body.innerText||"").replace(/\s+/g," ");
+          var found=(wantImport?IMP_KEYS:CHAT_KEYS).filter(function(k){ return txt.indexOf(k)>=0; }).length;
+          if(found>=(wantImport?2:0)) ok++;
+          note+=" / "+(wantImport?"导入":"对话")+"节点可见 "+found+"/4";
+        }
+      }catch(e){ note="跨源受限"; noBtn++; }
+      lines.push(s.n+"："+note);
+    });
+    var diag=document.getElementById("diag");
+    var b=el("span",{"class":"badge "+(noBtn?"bad":"ok")});
+    b.textContent=(wantImport?"露出导入模块":"回到对话模块")+"：成功 "+ok+"/10"+(noBtn?"，未找到入口 "+noBtn+" 套":"")+"｜"+lines.join("  ·  ");
+    diag.insertBefore(b, diag.firstChild);
+  }
+  document.getElementById("btnRevealImp").addEventListener("click",function(){ revealModules(true); });
+  document.getElementById("btnRevealChat").addEventListener("click",function(){ revealModules(false); });
+
+  build();
+  setView(state.view);
+  // 全部 iframe 加载完自动跑一次体检（不用懒加载，进页面即全量）
+  var pending = SCHEMES.length;
+  grid.addEventListener("load",function(){ if(--pending<=0) setTimeout(runAudit,400); },true);
+  var hint=document.getElementById("hint");
+  if(location.protocol==="file:"){
+    hint.hidden=false;
+    hint.innerHTML="你现在是用 <b>file://</b> 直接打开的：10 格预览照常显示，但<b>跨文件体检</b>与动效注入会被浏览器同源隔离挡住。要完整体检请用 HTTP 地址：<b>http://127.0.0.1:8090/index.html</b>";
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,471 @@
+<!--
+  方案编号: 04 | 风格名: Linear/Vercel 极客暗黑风 | 负责子智能体: Sub-Agent-Vercel-Glow
+  设计系统要点:
+  1. 纯黑底 + 单层居中静态放射光晕（紫蓝 radial-gradient）+ opacity .06 的 1px 双向网格，无持续动画；
+  2. 卡片用 padding-box/border-box 双层背景实现「上亮下暗」1px 渐变高光边框，顶缘 1px 彩虹品牌细线；
+  3. Geist 表单观感：深色输入 + focus 2px 蓝紫发光 ring，主按钮白底黑字（暗黑产品中最醒目），等宽字体承载 kbd/版本号/焦点微标记等极客细节。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · BOSS智库知识库 · 方案04 Vercel 极客暗黑</title>
+<style>
+  :root {
+    --bg: #0A0A0A;
+    --panel: #111113;
+    --border: rgba(255,255,255,.08);
+    --text: #E4E4E7;
+    --text-2: #8A8A93;
+    --accent: #5E6AD2;
+    --accent-glow: rgba(94,106,210,.25);
+    --ok: #4CB782;
+    --err: #F2555A;
+    --radius: 8px;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 32px 20px;
+    position: relative; overflow-x: hidden;
+  }
+  /* ===== 背景：居中放射光晕（静态） + 极淡网格 ===== */
+  .bg-glow {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(640px 440px at 50% 30%,
+      rgba(94,106,210,.17) 0%, rgba(139,92,246,.08) 45%, transparent 72%);
+  }
+  .bg-grid {
+    position: fixed; inset: 0; pointer-events: none; opacity: .06;
+    background-image:
+      linear-gradient(rgba(255,255,255,.9) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.9) 1px, transparent 1px);
+    background-size: 56px 56px;
+    background-position: center top;
+  }
+
+  /* ===== 登录卡片：渐变高光边框（上亮下暗）+ 顶部彩虹细线 ===== */
+  .card {
+    position: relative; width: 100%; max-width: 400px;
+    padding: 32px 30px 24px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    background:
+      linear-gradient(var(--panel), var(--panel)) padding-box,
+      linear-gradient(180deg, rgba(255,255,255,.20) 0%, rgba(255,255,255,.06) 40%, rgba(255,255,255,.02) 100%) border-box;
+    box-shadow: 0 24px 60px -24px rgba(0,0,0,.8), 0 0 80px -20px rgba(94,106,210,.10);
+  }
+  .card.is-error {
+    background:
+      linear-gradient(var(--panel), var(--panel)) padding-box,
+      linear-gradient(180deg, rgba(242,85,90,.55) 0%, rgba(242,85,90,.18) 45%, rgba(242,85,90,.06) 100%) border-box;
+  }
+  .rainbow {
+    position: absolute; top: 0; left: 8px; right: 8px; height: 1px;
+    background: linear-gradient(90deg, transparent, #5E6AD2, #8B5CF6, #EC4899, #5E6AD2, transparent);
+    border-radius: 1px;
+  }
+  /* 右上角快捷键提示 */
+  .shortcut {
+    position: absolute; top: 14px; right: 16px;
+    display: flex; align-items: center; gap: 4px;
+    color: var(--text-2); font-size: 11px;
+  }
+  kbd {
+    font: 11px/1 var(--mono);
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 3px 5px;
+  }
+
+  /* ===== 品牌区 ===== */
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .brand .logo {
+    width: 34px; height: 34px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: #fff; border-radius: 7px;
+  }
+  .brand h1 { font-size: 17px; font-weight: 600; letter-spacing: .01em; }
+  .brand-sub { color: var(--text-2); margin-bottom: 26px; font-size: 13px; }
+
+  /* ===== 表单（Geist 观感） ===== */
+  .field { margin-bottom: 16px; }
+  .label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  label { font-size: 13px; font-weight: 500; color: var(--text-2); }
+  .input-wrap { position: relative; }
+  .fmark {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font: 10px/1 var(--mono); color: var(--accent);
+    opacity: 0; transition: opacity .15s ease; pointer-events: none;
+  }
+  .input-wrap:focus-within .fmark { opacity: .9; }
+  .input-wrap:has(.pw-btn) .fmark { right: 58px; }
+  input[type="text"], input[type="password"] {
+    width: 100%; font: 13px/1.4 inherit; color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input::placeholder { color: #55555c; }
+  input:hover { border-color: rgba(255,255,255,.16); }
+  input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .field.has-error input {
+    border-color: var(--err);
+    box-shadow: 0 0 0 3px rgba(242,85,90,.18);
+  }
+  .field.has-error .hint { color: var(--err); }
+  .pw-btn {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    font: 11px/1 var(--mono); color: var(--text-2);
+    background: transparent; border: 1px solid transparent; border-radius: 4px;
+    padding: 5px 6px; cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .pw-btn:hover { color: var(--text); border-color: var(--border); }
+  .pw-btn:focus-visible { outline: none; color: var(--text); box-shadow: 0 0 0 3px var(--accent-glow); border-color: var(--accent); }
+
+  /* 记住我 / 忘记密码 */
+  .row-between { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 18px; }
+  .remember { display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--text-2); user-select: none; }
+  .remember input {
+    appearance: none; -webkit-appearance: none;
+    width: 14px; height: 14px; flex: none; border-radius: 4px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.22); background: var(--bg);
+    display: grid; place-content: center; transition: all .12s ease;
+  }
+  .remember input:checked { background: var(--accent); border-color: var(--accent); }
+  .remember input:checked::before {
+    content: ""; width: 8px; height: 8px;
+    clip-path: polygon(14% 47%, 0 60%, 40% 100%, 100% 22%, 86% 9%, 39% 72%);
+    background: #fff;
+  }
+  .remember input:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); }
+  .forgot { color: var(--accent); text-decoration: none; }
+  .forgot:hover { text-decoration: underline; }
+  .forgot:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); border-radius: 3px; }
+
+  /* 错误行 */
+  .error-row {
+    display: none; align-items: center; gap: 8px;
+    color: var(--err); font-size: 12.5px;
+    background: rgba(242,85,90,.07);
+    border: 1px solid rgba(242,85,90,.25);
+    border-radius: 6px; padding: 8px 10px; margin-bottom: 14px;
+  }
+  .card.is-error .error-row { display: flex; }
+  .error-row svg { flex: none; }
+
+  /* 主按钮：Geist 白底黑字 */
+  .btn-primary {
+    width: 100%; font: 13px/1 inherit; font-weight: 600;
+    color: #0A0A0A; background: #fff;
+    border: 1px solid #fff; border-radius: 6px;
+    padding: 11px 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background-color .15s ease, transform .1s ease, box-shadow .15s ease;
+  }
+  .btn-primary:hover { background: #EDEDED; border-color: #EDEDED; }
+  .btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow), 0 0 0 1px #fff inset; }
+  .btn-primary:active { transform: scale(.99); }
+  .btn-primary[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
+  .spinner {
+    width: 12px; height: 12px; border-radius: 50%; display: none; flex: none;
+    border: 2px solid rgba(10,10,10,.25); border-top-color: #0A0A0A;
+    animation: spin .7s linear infinite;
+  }
+  .btn-primary.loading .spinner { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn-note { font: 10.5px/1.6 var(--mono); color: var(--text-2); margin-top: 8px; text-align: center; }
+  .btn-note b { color: var(--accent); font-weight: 400; }
+
+  /* 抖动（≤240ms，reduced-motion 时关闭） */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    50% { transform: translateX(4px); }
+    75% { transform: translateX(-2px); }
+  }
+  .card.shake { animation: shake 220ms ease; }
+
+  /* 分隔线 + 第三方登录 */
+  .divider { display: flex; align-items: center; gap: 12px; margin: 24px 0 16px; color: var(--text-2); font-size: 12px; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .socials { display: flex; justify-content: center; gap: 14px; }
+  .sso {
+    width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-2); background: transparent;
+    border: 1px solid rgba(255,255,255,.14);
+    transition: color .15s ease, border-color .15s ease, transform .1s ease;
+  }
+  .sso:hover { color: #fff; border-color: rgba(255,255,255,.4); }
+  .sso:active { transform: scale(.96); }
+  .sso:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); border-color: var(--accent); }
+  .sso-note { text-align: center; font: 10.5px/1.6 var(--mono); color: var(--text-2); min-height: 18px; margin-top: 8px; }
+
+  /* 底部 */
+  .copyright { text-align: center; color: var(--text-2); font-size: 12px; margin-top: 18px; }
+  .meta {
+    text-align: center; font: 10px/1.6 var(--mono); color: #55555c;
+    border-top: 1px solid var(--border); margin: 16px -30px -24px; padding: 12px 30px 0;
+  }
+  .meta .dot-ok { color: var(--ok); }
+
+  /* ===== 响应式四档 ===== */
+  @media (max-width: 1024px) {
+    body { padding: 24px 16px; }
+  }
+  @media (max-width: 768px) {
+    .card { padding: 28px 24px 20px; }
+    .meta { margin: 14px -24px -20px; padding: 12px 24px 0; }
+    .shortcut { position: static; justify-content: flex-end; margin-bottom: 10px; }
+    .brand { margin-top: 0; }
+  }
+  @media (max-width: 390px) {
+    body { padding: 16px 12px; }
+    .card { padding: 24px 18px 18px; }
+    .meta { margin: 12px -18px -18px; padding: 10px 18px 0; }
+    .brand h1 { font-size: 16px; }
+    .socials { gap: 10px; }
+    .sso { width: 38px; height: 38px; }
+    .kbd-label { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="bg-glow" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <main class="card is-error" id="card">
+    <div class="rainbow" aria-hidden="true"></div>
+    <div class="shortcut" aria-label="快捷键提示：Command 加 Enter 快捷登录">
+      <kbd>⌘</kbd><kbd>Enter</kbd><span class="kbd-label">&nbsp;快捷登录</span>
+    </div>
+
+    <!-- 品牌区 -->
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg width="18" height="16" viewBox="0 0 18 16" fill="none">
+          <path d="M9 1.5 16 14H2L9 1.5Z" fill="#0A0A0A"/>
+          <path d="M9 6 12.5 12h-7L9 6Z" fill="#fff"/>
+        </svg>
+      </span>
+      <h1>BOSS智库知识库</h1>
+    </div>
+    <p class="brand-sub">企业级智能知识库系统 · 登录后即可检索与导入文档</p>
+
+    <form id="loginForm" novalidate>
+      <!-- 账号 -->
+      <div class="field has-error" id="fieldAccount">
+        <div class="label-row">
+          <label for="account">账号</label>
+        </div>
+        <div class="input-wrap">
+          <input type="text" id="account" name="account" placeholder="手机号 / 邮箱 / 用户名"
+                 autocomplete="username" spellcheck="false" aria-describedby="formError">
+          <span class="fmark" aria-hidden="true">focused</span>
+        </div>
+      </div>
+
+      <!-- 密码 -->
+      <div class="field has-error" id="fieldPassword">
+        <div class="label-row">
+          <label for="password">密码</label>
+        </div>
+        <div class="input-wrap">
+          <input type="password" id="password" name="password" placeholder="请输入密码"
+                 autocomplete="current-password" spellcheck="false" aria-describedby="formError">
+          <span class="fmark" aria-hidden="true">focused</span>
+          <button type="button" class="pw-btn" id="pwToggle" aria-label="显示密码" aria-pressed="false">show</button>
+        </div>
+      </div>
+
+      <!-- 记住我 / 忘记密码 -->
+      <div class="row-between">
+        <label class="remember" for="remember">
+          <input type="checkbox" id="remember" name="remember">
+          记住我
+        </label>
+        <a class="forgot" href="#" id="forgotLink">忘记密码？</a>
+      </div>
+
+      <!-- 静态错误态（BRIEF 2.3 要求；提交失败时重新触发并抖动） -->
+      <div class="error-row" id="formError" role="alert">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <circle cx="7" cy="7" r="6" stroke="#F2555A" stroke-width="1.4"/>
+          <path d="M7 3.5v4" stroke="#F2555A" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="7" cy="10.2" r=".9" fill="#F2555A"/>
+        </svg>
+        用户名或密码错误
+      </div>
+
+      <!-- 主 CTA -->
+      <button type="submit" class="btn-primary" id="submitBtn">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="btnText">登录</span>
+      </button>
+      <p class="btn-note" aria-hidden="true">演示账号 <b>boss / boss123</b> · 其他组合触发失败态</p>
+    </form>
+
+    <!-- 第三方登录 -->
+    <div class="divider">或使用以下方式登录</div>
+    <div class="socials">
+      <button type="button" class="sso" data-name="企业微信" aria-label="使用企业微信登录">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M13.2 6.2c-3.4 0-6.1 2.2-6.1 4.9 0 1 .4 1.9 1.1 2.6l-.5 1.6 1.9-.9c.5.1 1 .2 1.6.2"/>
+          <path d="M15.6 4.2c-2.9 0-5.4 1.7-6.2 4"/>
+          <path d="M8.6 10.8c2.5 0 4.6-1.5 4.6-3.4S11.1 4 8.6 4 4 5.5 4 7.4c0 .9.5 1.7 1.3 2.3l-.5 1.4 1.6-.7"/>
+          <circle cx="6.7" cy="6.6" r=".5" fill="currentColor" stroke="none"/>
+          <circle cx="10.4" cy="6.6" r=".5" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+      <button type="button" class="sso" data-name="钉钉" aria-label="使用钉钉登录">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 6.5C4 5.1 5.1 4 6.5 4h7C14.9 4 16 5.1 16 6.5v5c0 1.4-1.1 2.5-2.5 2.5H9l-4 2.5V14h-.5A2.5 2.5 0 0 1 4 11.5v-5Z"/>
+          <path d="m7.2 9.3 2.2 1 2.8-2.9c.5-.5-.1-1.4-.8-1L9.3 8.8 7.8 8.2c-.7-.2-1.1.7-.6 1.1Z"/>
+        </svg>
+      </button>
+      <button type="button" class="sso" data-name="飞书" aria-label="使用飞书登录">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12.5c2.8.7 5.4.1 7.8-1.7 2-1.5 3.4-3.4 4.3-5.8"/>
+          <path d="M5.2 7.2c2.5.4 4.9-.2 7.2-1.8"/>
+          <path d="M15.1 4.9c1.6 3 1.7 6.2.3 9.4l-1.8-.6c.9-2.5.8-5-.5-7.4"/>
+        </svg>
+      </button>
+      <button type="button" class="sso" data-name="GitHub" aria-label="使用 GitHub 登录">
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+        </svg>
+      </button>
+    </div>
+    <p class="sso-note mono" id="ssoNote" aria-live="polite"></p>
+
+    <p class="copyright">© 2026 BOSS智库 · 企业级智能知识库系统</p>
+    <p class="meta">v1.0.0 · local · <span class="dot-ok">●</span> 127.0.0.1:8000</p>
+  </main>
+
+<script>
+(function () {
+  'use strict';
+  var card = document.getElementById('card');
+  var form = document.getElementById('loginForm');
+  var account = document.getElementById('account');
+  var password = document.getElementById('password');
+  var pwToggle = document.getElementById('pwToggle');
+  var submitBtn = document.getElementById('submitBtn');
+  var btnText = document.getElementById('btnText');
+  var fieldAccount = document.getElementById('fieldAccount');
+  var fieldPassword = document.getElementById('fieldPassword');
+  var ssoNote = document.getElementById('ssoNote');
+  var loading = false;
+
+  function setError(on, shake) {
+    if (on) {
+      card.classList.add('is-error');
+      fieldAccount.classList.add('has-error');
+      fieldPassword.classList.add('has-error');
+      if (shake && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        card.classList.remove('shake');
+        void card.offsetWidth; /* 重启动画 */
+        card.classList.add('shake');
+        setTimeout(function () { card.classList.remove('shake'); }, 240);
+      }
+    } else {
+      card.classList.remove('is-error');
+      fieldAccount.classList.remove('has-error');
+      fieldPassword.classList.remove('has-error');
+    }
+  }
+
+  /* 密码显隐：等宽文字 show/hide */
+  pwToggle.addEventListener('click', function () {
+    var show = password.type === 'password';
+    password.type = show ? 'text' : 'password';
+    pwToggle.textContent = show ? 'hide' : 'show';
+    pwToggle.setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+    pwToggle.setAttribute('aria-pressed', String(show));
+    password.focus();
+  });
+
+  /* 输入时清除静态错误态 */
+  [account, password].forEach(function (el) {
+    el.addEventListener('input', function () { setError(false); });
+  });
+
+  /* 提交：空值校验 / loading / 失败抖动 / demo 成功 */
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (loading) return;
+    if (!account.value.trim() || !password.value) {
+      setError(true, true);
+      (!account.value.trim() ? account : password).focus();
+      return;
+    }
+    loading = true;
+    submitBtn.disabled = true;
+    submitBtn.classList.add('loading');
+    btnText.textContent = '正在验证…';
+    setTimeout(function () {
+      loading = false;
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('loading');
+      var ok = account.value.trim() === 'boss' && password.value === 'boss123';
+      if (ok) {
+        btnText.textContent = '登录成功';
+        submitBtn.style.background = '#4CB782';
+        submitBtn.style.borderColor = '#4CB782';
+        setTimeout(function () {
+          btnText.textContent = '登录';
+          submitBtn.style.background = '';
+          submitBtn.style.borderColor = '';
+        }, 1600);
+      } else {
+        setError(true, true);
+        btnText.textContent = '登录';
+      }
+    }, 900);
+  });
+
+  /* ⌘/Ctrl + Enter 快捷登录（卡片提示对应真实行为） */
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  });
+
+  /* 第三方登录：本地演示反馈 */
+  Array.prototype.forEach.call(document.querySelectorAll('.sso'), function (btn) {
+    btn.addEventListener('click', function () {
+      ssoNote.textContent = '// ' + btn.getAttribute('data-name') + ' OAuth 未接入本地演示环境';
+    });
+  });
+
+  /* 忘记密码：本地演示反馈 */
+  document.getElementById('forgotLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    ssoNote.textContent = '// 密码重置需联系管理员（演示）';
+  });
+})();
+</script>
+</body>
+</html>

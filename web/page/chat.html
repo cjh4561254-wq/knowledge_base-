@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  视觉基准：方案 05 · Stripe 流体渐变风（demo-preview/schemes/05-stripe.main.html）
+  要点：纯 CSS 多层 radial-gradient 静态 mesh（无 filter:blur 大图层、无持续 @keyframes 位移）、
+  clip-path 斜切分区（--cut）、白卡 + 12px 圆角 + 三层柔和阴影、hover 抬升、
+  floating-label 表单、tabular-nums 数字、blurple 主按钮 + 深藏青文字。
+  功能契约（不可退化）：id 集合、SSE 事件名/payload、fetch URL/方法/请求体、
+  「状态：已完成」文案逻辑、localStorage kb_session_id。
+  鉴权：GET /api/me 显示账号；POST /logout 退出；任何 fetch/EventSource 401 → /login.html?next=…
+-->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>BOSS智库知识库</title>
+  <style>
+    :root{
+      --blurple:#635BFF; --blurple-deep:#4F46E5; --cyan:#00D4FF; --purple:#A960FF; --pink:#FF5C99;
+      --ink:#0A2540; --sub:#425466; --body:#1A1F36; --page:#FFFFFF; --page-alt:#F6FBFF;
+      --ok:#0ED47E; --err:#DF1B51;
+      --line:rgba(10,37,64,.10); --line-soft:rgba(10,37,64,.06);
+      --r-sm:8px; --r-md:10px; --r-lg:12px;
+      --sh:0 1px 2px rgba(10,37,64,.06), 0 8px 24px rgba(10,37,64,.08), 0 24px 48px rgba(10,37,64,.06);
+      --sh-hover:0 1px 2px rgba(10,37,64,.06), 0 14px 36px rgba(10,37,64,.14), 0 28px 56px rgba(10,37,64,.08);
+      --cut:clamp(30px, 3.6vw, 64px);
+      --sans:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+      --mono:"SFMono-Regular",Consolas,"Cascadia Mono",monospace;
+    }
+    *{box-sizing:border-box}
+    html{-webkit-text-size-adjust:100%}
+    body{
+      margin:0; height:100vh; overflow:hidden;
+      display:flex; flex-direction:column;
+      font-family:var(--sans); color:var(--body); background:var(--page);
+      line-height:1.6; font-size:14px;
+    }
+    button{font-family:inherit; cursor:pointer}
+    :focus-visible{outline:3px solid rgba(99,91,255,.65); outline-offset:2px; border-radius:6px}
+
+    /* ================= 顶部品牌条：白底半透 + blurple 字标 ================= */
+    .topbar{
+      flex:none; z-index:30;
+      display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+      padding:10px clamp(14px, 2.4vw, 28px);
+      background:rgba(255,255,255,.82);
+      backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); /* 仅顶栏一处毛玻璃 */
+      border-bottom:1px solid var(--line-soft);
+    }
+    .brand{display:flex; align-items:center; gap:10px; min-width:0}
+    .brand svg{flex:none}
+    .title{display:flex; flex-direction:column; line-height:1.15; min-width:0}
+    .title strong{font-size:15px; font-weight:800; color:var(--blurple); letter-spacing:.2px; white-space:nowrap}
+    .title span{font-size:11.5px; color:var(--sub); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .status{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--sub); font-weight:600}
+    .dot{width:8px; height:8px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 3px rgba(14,212,126,.22); flex:none}
+    .dot.off{background:#829AB1; box-shadow:0 0 0 3px rgba(130,154,177,.22)}
+    .pill{
+      font-size:12px; color:var(--sub); border:1px solid var(--line);
+      padding:5px 10px; border-radius:999px; background:var(--page-alt);
+      font-variant-numeric:tabular-nums; white-space:nowrap;
+    }
+    .top-actions{margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    /* Stripe 式 pill switch（原 checkbox 隐藏保留，id/checked 语义不变） */
+    .switch{position:relative; display:inline-flex; align-items:center; gap:8px; font-size:12.5px; color:var(--sub); font-weight:600; cursor:pointer; user-select:none; white-space:nowrap}
+    .switch input{position:absolute; opacity:0; width:0; height:0}
+    .track{width:38px; height:22px; border-radius:999px; background:rgba(10,37,64,.22); position:relative; transition:background .2s; flex:none}
+    .track::after{content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(10,37,64,.3); transition:left .2s}
+    .switch input:checked + .track{background:var(--blurple)}
+    .switch input:checked + .track::after{left:19px}
+    .switch input:focus-visible + .track{outline:3px solid rgba(99,91,255,.65); outline-offset:2px}
+    .btn-ghost{
+      background:#fff; border:1px solid var(--line); color:var(--ink);
+      border-radius:var(--r-sm); padding:7px 13px; font-size:12.5px; font-weight:700;
+      transition:background .2s, transform .2s, border-color .2s; white-space:nowrap;
+    }
+    .btn-ghost:hover{background:rgba(99,91,255,.06); border-color:rgba(99,91,255,.4); transform:translateY(-1px)}
+    .btn-ghost:disabled{opacity:.55; cursor:not-allowed; transform:none}
+    .btn-ghost.danger{border-color:rgba(223,27,81,.35); color:var(--err)}
+    .btn-ghost.danger:hover{background:rgba(223,27,81,.06); border-color:rgba(223,27,81,.55)}
+    .acct{
+      display:inline-flex; align-items:center; gap:7px;
+      background:var(--page-alt); border:1px solid var(--line); border-radius:999px;
+      padding:5px 12px 5px 9px; font-size:12.5px; color:var(--sub); font-weight:600; white-space:nowrap;
+    }
+    .acct svg{flex:none}
+    .acct b{color:var(--ink); font-weight:700; max-width:140px; overflow:hidden; text-overflow:ellipsis}
+
+    /* ================= hero：静态 mesh 渐变 + clip-path 斜切 ================= */
+    .hero-wrap{
+      flex:none; position:relative;
+      background:
+        radial-gradient(46% 68% at 6% 6%,   rgba(99,91,255,.30), transparent 64%),
+        radial-gradient(36% 56% at 34% 0%,  rgba(0,212,255,.22), transparent 62%),
+        radial-gradient(42% 62% at 70% 12%, rgba(169,96,255,.22), transparent 64%),
+        radial-gradient(34% 52% at 97% 78%, rgba(255,92,153,.16), transparent 62%),
+        radial-gradient(30% 46% at 48% 96%, rgba(99,91,255,.14), transparent 60%),
+        linear-gradient(180deg, #FFFFFF 0%, var(--page-alt) 100%);
+      clip-path:polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), 0 100%);
+    }
+    .hero{max-width:1080px; margin:0 auto; padding:clamp(14px, 2.4vw, 24px) clamp(16px, 3vw, 28px) calc(var(--cut) + 8px)}
+    .eyebrow{
+      display:inline-flex; align-items:center; gap:8px;
+      border:1px solid rgba(99,91,255,.4); background:rgba(99,91,255,.06);
+      border-radius:999px; padding:4px 13px; font-size:12px; font-weight:700; color:var(--blurple-deep);
+    }
+    .eyebrow i{width:8px; height:8px; border-radius:2px; background:linear-gradient(135deg,var(--cyan),var(--blurple)); flex:none}
+    .hero h1{font-size:clamp(19px, 2.5vw, 28px); font-weight:800; color:var(--ink); line-height:1.25; margin:10px 0 6px; letter-spacing:.3px}
+    .hero-sub{font-size:13px; color:var(--sub); margin:0; max-width:640px}
+    .hero-session{margin:8px 0 0; font-size:12px; color:var(--sub)}
+    .hero-session code{
+      font-family:var(--mono); font-size:11.5px; color:var(--blurple-deep);
+      background:#fff; border:1px solid var(--line); border-radius:6px; padding:1px 8px;
+      font-variant-numeric:tabular-nums; word-break:break-all;
+    }
+
+    /* ================= 主区：白卡 ================= */
+    .app{flex:1; min-height:0; display:flex; padding:6px clamp(12px, 2.4vw, 28px) clamp(12px, 1.8vw, 20px)}
+    .chat-card{
+      flex:1; min-height:0; width:100%; max-width:1080px; margin:0 auto;
+      display:flex; flex-direction:column;
+      background:#fff; border:1px solid var(--line-soft); border-radius:var(--r-lg);
+      box-shadow:var(--sh); overflow:hidden;
+    }
+    .chat{
+      flex:1; overflow:auto; padding:18px clamp(14px, 2.2vw, 22px) 10px;
+      background:linear-gradient(180deg, var(--page-alt), #fff 26%);
+    }
+    .dayline{
+      text-align:center; color:var(--sub); font-size:11.5px; font-weight:700;
+      font-variant-numeric:tabular-nums; margin:2px 0 16px;
+    }
+    .dayline::before,.dayline::after{content:""; display:inline-block; width:36px; height:1px; background:var(--line); vertical-align:middle; margin:0 10px}
+
+    /* ---- 消息 ---- */
+    .msg{display:flex; gap:12px; margin:0 0 20px; align-items:flex-end}
+    .msg.user{justify-content:flex-end}
+    /* 关键：只让“消息内容容器”(排除头像)在 flex 中可伸缩，避免被压到“1 个字宽”导致竖排换行 */
+    .msg > div:not(.avatar){flex:1; min-width:0}
+    .msg.user > div:not(.avatar){display:flex; flex-direction:column; align-items:flex-end}
+    .avatar{
+      flex:0 0 auto; width:36px; height:36px; border-radius:var(--r-sm);
+      display:flex; align-items:center; justify-content:center;
+      font-size:14px; font-weight:800; color:#fff; background:#829AB1;
+      box-shadow:0 1px 2px rgba(10,37,64,.1), 0 6px 16px rgba(99,91,255,.25);
+    }
+    .avatar.bot{background:linear-gradient(135deg, var(--blurple), var(--purple) 60%, var(--pink))}
+    .bubble{
+      max-width:min(760px, 84%);
+      display:inline-block;
+      border-radius:var(--r-lg) var(--r-lg) var(--r-lg) 3px;
+      padding:13px 16px;
+      border:1px solid var(--line-soft);
+      background:#fff;
+      box-shadow:var(--sh);
+      position:relative;
+      line-height:1.6; font-size:14px;
+      white-space:pre-wrap;
+      overflow-wrap:break-word;
+    }
+    .msg.user .bubble{
+      background:var(--blurple); color:#fff; border:none;
+      border-radius:var(--r-lg) var(--r-lg) 3px var(--r-lg);
+      box-shadow:0 1px 2px rgba(10,37,64,.1), 0 6px 18px rgba(99,91,255,.28);
+    }
+    .meta{
+      font-size:11.5px; color:var(--sub); margin-top:6px;
+      font-variant-numeric:tabular-nums;
+    }
+    .msg.user .meta{color:var(--sub)}
+
+    /* ---- 阶段进度：Stripe 式柔和折叠卡片 ---- */
+    details.progress{
+      margin-top:10px; width:100%;
+      border:1px solid var(--line-soft); border-radius:var(--r-md);
+      background:var(--page-alt); overflow:hidden;
+    }
+    details.progress summary{
+      cursor:pointer; user-select:none; list-style:none;
+      display:flex; align-items:center; gap:8px;
+      padding:11px 14px; font-size:12.5px; font-weight:700; color:var(--ink);
+    }
+    details.progress summary::-webkit-details-marker{display:none}
+    details.progress summary::after{
+      content:""; margin-left:auto; flex:none; width:10px; height:10px;
+      border-right:1.8px solid var(--sub); border-bottom:1.8px solid var(--sub);
+      transform:translateY(-2px) rotate(45deg); transition:transform .2s;
+    }
+    details[open].progress summary::after{transform:translateY(2px) rotate(-135deg)}
+    details.progress summary:hover{background:rgba(99,91,255,.05)}
+    .progress ul{
+      margin:0; padding:4px 14px 12px; list-style:none;
+      border-top:1px dashed var(--line);
+    }
+    .progress li{
+      display:flex; align-items:center; gap:9px;
+      margin:2px 0; padding:5px 0; font-size:12.5px; color:var(--body);
+    }
+    .progress li svg{flex:none}
+
+    /* ---- 追问确认：商品名不确定时后端把反问句作为答案下发，前端把候选型号渲染成可点击标签 ---- */
+    .confirm-options{
+      margin-top:12px; background:#FFF7FA;
+      border:1px solid rgba(255,92,153,.35); border-radius:var(--r-md);
+      padding:12px 14px;
+    }
+    .confirm-options .meta{margin:0 0 8px; color:var(--sub); font-weight:700}
+    .confirm-chips{display:flex; flex-wrap:wrap; gap:8px}
+    .chip{
+      border:1.5px solid var(--blurple); color:var(--blurple-deep); background:rgba(99,91,255,.05);
+      padding:5px 14px; border-radius:999px; font-size:12.5px; font-weight:700;
+      cursor:pointer; transition:background .2s, color .2s, transform .2s;
+    }
+    .chip:hover{background:var(--blurple); color:#fff; transform:translateY(-2px)}
+
+    /* ---- 答案图片：12px 圆角缩略 + hover 抬升 ---- */
+    .answer-images{margin-top:12px; display:flex; flex-direction:column; gap:10px}
+    .answer-images img{
+      display:block;
+      max-width:min(100%, 600px); max-height:600px; width:auto; height:auto;
+      border-radius:var(--r-lg); border:1px solid var(--line-soft);
+      background:#fff; box-shadow:var(--sh);
+      transition:transform .2s, box-shadow .2s;
+    }
+    .answer-images img:hover{transform:translateY(-4px); box-shadow:var(--sh-hover)}
+    .answer-images a{
+      font-family:var(--mono); font-size:11px; color:var(--sub);
+      text-decoration:none; word-break:break-all;
+    }
+    .answer-images a:hover{color:var(--blurple-deep)}
+
+    /* ---- 答案内联引用角标（[doc:N] → 上标数字）----
+       为什么 badge（不可点）与 live（可点）用完全相同的位置/尺寸/字号，只差颜色和 cursor：
+       流式阶段还没有 sources，只能先渲染静态角标；final 到达后原地升级为可点击。
+       若两态尺寸不同，final 那一刻整段文字会重排跳动，就是需求里禁止的「闪烁」。 */
+    .cite{
+      display:inline-flex; align-items:center; justify-content:center;
+      min-width:19px; height:19px; margin:0 2px; padding:0 4px;
+      border:1.5px solid rgba(99,91,255,.35); border-radius:6px;
+      font-size:11.5px; line-height:1; vertical-align:super;
+      color:var(--blurple-deep); background:rgba(99,91,255,.05);
+      font-weight:800; font-variant-numeric:tabular-nums;
+      user-select:none; transition:background .2s, color .2s, transform .2s;
+    }
+    .cite-live{
+      border-color:var(--blurple); background:rgba(99,91,255,.08); cursor:pointer;
+    }
+    .cite-live:hover,.cite-live:focus{background:var(--blurple); color:#fff; transform:translateY(-2px); outline:none}
+
+    /* ---- 「参考来源」：分栏卡片 ---- */
+    .answer-sources{margin-top:12px; padding-top:10px; border-top:1px dashed var(--line); width:100%}
+    .answer-sources .src-head{
+      font-size:13px; font-weight:800; color:var(--ink); margin-bottom:8px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .answer-sources .src-head::before{content:""; width:4px; height:14px; border-radius:2px; background:linear-gradient(180deg, var(--blurple), var(--cyan))}
+    .srcs{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:10px}
+    .src{
+      display:flex; gap:10px; align-items:flex-start;
+      border:1px solid var(--line-soft); border-radius:var(--r-md);
+      padding:11px 13px; background:#fff; box-shadow:var(--sh);
+      transition:transform .2s, box-shadow .2s;
+    }
+    .src:hover{transform:translateY(-4px); box-shadow:var(--sh-hover)}
+    .src .s-no{
+      flex:none; font-family:var(--mono); font-size:11.5px; font-weight:700; color:var(--blurple-deep);
+      background:rgba(99,91,255,.08); border:1px solid rgba(99,91,255,.3); border-radius:6px;
+      height:22px; padding:0 6px; display:flex; align-items:center; font-variant-numeric:tabular-nums;
+    }
+    .src .s-main{min-width:0; flex:1}
+    .src .s-title{font-size:12.5px; font-weight:600; color:var(--ink); line-height:1.45; overflow-wrap:break-word}
+    .src .s-title a{color:var(--blurple-deep); text-decoration:none}
+    .src .s-title a:hover{text-decoration:underline}
+    .src .s-meta{display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; font-size:11px; color:var(--sub)}
+    .src .s-meta code{
+      font-family:var(--mono); font-size:10.5px; color:var(--sub); background:var(--page-alt);
+      border:1px solid var(--line-soft); border-radius:5px; padding:1px 5px; word-break:break-all;
+    }
+    .src .tag{border-radius:999px; padding:1px 9px; font-weight:700; font-size:10.5px; flex:none}
+    .src .tag-kb{color:var(--blurple-deep); border:1px solid rgba(99,91,255,.45); background:rgba(99,91,255,.06)}
+    .src .tag-web{color:#0B7EA4; border:1px solid rgba(0,212,255,.5); background:rgba(0,212,255,.08)}
+    .src .tag-other{color:var(--sub); border:1px solid var(--line); background:var(--page-alt)}
+    .src .rel{
+      margin-left:auto; font-family:var(--mono); font-weight:700; font-size:11.5px; color:var(--ink);
+      font-variant-numeric:tabular-nums; white-space:nowrap;
+    }
+    .src .rel small{color:var(--sub); font-weight:400; font-family:var(--sans); margin-right:3px}
+    @keyframes srcFlash{
+      0%{background:rgba(99,91,255,.16); border-color:var(--blurple)}
+      100%{background:#fff; border-color:var(--line-soft)}
+    }
+    .srcs li.flash{animation:srcFlash 1.2s ease-out 1; border-radius:var(--r-md)}
+
+    /* ---- 流式等待点 ---- */
+    .typing{display:inline-flex; gap:6px; align-items:center; padding:2px 0}
+    .dot-t{
+      width:7px; height:7px; border-radius:50%; background:var(--blurple);
+      animation:bounce 1.2s infinite ease-in-out;
+    }
+    .dot-t:nth-child(2){animation-delay:.15s}
+    .dot-t:nth-child(3){animation-delay:.3s}
+    @keyframes bounce{
+      0%,80%,100%{transform:translateY(0);opacity:.55}
+      40%{transform:translateY(-5px);opacity:1}
+    }
+
+    /* ---- composer：白卡 + floating label + blurple 胶囊发送 ---- */
+    .composer{
+      flex:none; border-top:1px solid var(--line-soft);
+      padding:16px clamp(14px, 2.2vw, 22px) 12px;
+      display:flex; gap:12px; align-items:flex-end; background:#fff;
+    }
+    .comp-grid{flex:1; min-width:0; display:flex; flex-direction:column}
+    .field{position:relative; flex:1}
+    .field textarea{
+      width:100%; resize:vertical; min-height:52px; max-height:160px;
+      font-family:inherit; font-size:14px; line-height:1.5; color:var(--body);
+      border:1.5px solid var(--line); border-radius:var(--r-md);
+      padding:12px 14px; background:var(--page-alt);
+      transition:border-color .2s, box-shadow .2s, background .2s;
+    }
+    .field textarea:focus{border-color:var(--blurple); box-shadow:0 0 0 3px rgba(99,91,255,.15); background:#fff; outline:none}
+    .float-label{
+      position:absolute; left:12px; top:13px; padding:0 6px;
+      font-size:14px; color:var(--sub); background:transparent;
+      pointer-events:none; transition:top .15s, font-size .15s, color .15s;
+    }
+    .field textarea:focus ~ .float-label,
+    .field textarea:not(:placeholder-shown) ~ .float-label{
+      top:-8px; font-size:11.5px; font-weight:700; color:var(--blurple-deep);
+      background:linear-gradient(180deg,#fff,#fff); border-radius:4px;
+    }
+    .send{
+      flex:none; height:50px; min-width:104px; padding:0 22px;
+      border:none; border-radius:999px; cursor:pointer;
+      font-size:14.5px; font-weight:800; color:#fff; background:var(--blurple);
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      box-shadow:0 1px 2px rgba(10,37,64,.1), 0 6px 20px rgba(99,91,255,.3);
+      transition:background .2s, transform .2s, box-shadow .2s, opacity .2s;
+    }
+    .send:hover:not(:disabled){background:#5750F1; transform:translateY(-2px); box-shadow:var(--sh-hover)}
+    .send:active:not(:disabled){transform:translateY(0)}
+    .send:disabled{opacity:.5; cursor:not-allowed; transform:none; box-shadow:none}
+    .send svg{flex:none}
+    .keys{display:flex; gap:14px; font-size:11.5px; color:var(--sub); margin-top:8px; flex-wrap:wrap}
+    .kbd{
+      font-family:var(--mono); font-size:10.5px;
+      background:var(--page-alt); border:1px solid var(--line); border-bottom-width:2px;
+      padding:1px 6px; border-radius:5px; color:var(--ink);
+    }
+
+    /* ---- 空态 / 错误态 ---- */
+    .answer-error{
+      color:var(--err); font-weight:600;
+      background:rgba(223,27,81,.06); border:1px solid rgba(223,27,81,.28);
+      border-radius:var(--r-md); padding:10px 12px;
+    }
+
+    /* ================= 响应式 ================= */
+    @media (max-width:1024px){
+      .hero h1{font-size:22px}
+    }
+    @media (max-width:768px){
+      :root{--cut:clamp(20px, 3.4vw, 30px)}
+      .bubble{max-width:88%}
+      .title span{display:none}
+      .srcs{grid-template-columns:1fr}
+    }
+    @media (max-width:520px){
+      .topbar{gap:8px; padding:8px 12px}
+      .top-actions{margin-left:0; width:100%; justify-content:space-between; gap:6px}
+      .hero-sub{font-size:12px}
+      .hero-session{font-size:11px}
+      .acct b{max-width:84px}
+      .composer{padding:12px 12px 10px}
+      .send{min-width:0; padding:0 16px; height:48px}
+      .keys{gap:8px}
+      .app{padding:4px 8px 10px}
+      .status .pill{max-width:130px; overflow:hidden; text-overflow:ellipsis}
+    }
+    @media (prefers-reduced-motion: reduce){
+      *, *::before, *::after{transition:none !important; animation:none !important}
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 26 26" aria-hidden="true">
+        <defs><linearGradient id="kbLogoLg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#00D4FF"/><stop offset=".55" stop-color="#635BFF"/><stop offset="1" stop-color="#A960FF"/>
+        </linearGradient></defs>
+        <rect x="2" y="4" width="22" height="18" rx="4" fill="none" stroke="url(#kbLogoLg)" stroke-width="2.4"/>
+        <path d="M7 10h7M7 14h12" stroke="url(#kbLogoLg)" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <div class="title">
+        <strong>BOSS智库知识库</strong>
+        <span id="subTitle">在线 · 可查询知识库与联网信息</span>
+      </div>
+    </div>
+    <span class="status"><span class="dot" id="statusDot" aria-hidden="true"></span><span class="pill" id="apiPill">API: 未连接</span></span>
+    <div class="top-actions">
+      <label class="switch" title="开启后答案按 SSE 增量输出">
+        <input type="checkbox" id="streamToggle" checked>
+        <span class="track" aria-hidden="true"></span>流式输出
+      </label>
+      <button class="btn-ghost danger" id="btnClear" type="button">清空对话</button>
+      <span class="acct" title="当前登录账号">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="4.4" r="2.6" fill="none" stroke="#635BFF" stroke-width="1.5"/><path d="M2 12.4c1-2.3 2.8-3.4 5-3.4s4 1.1 5 3.4" fill="none" stroke="#635BFF" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <b id="acctName">检测中…</b>
+      </span>
+      <button class="btn-ghost" id="btnLogout" type="button">退出登录</button>
+    </div>
+  </header>
+
+  <section class="hero-wrap" aria-label="品牌主张">
+    <div class="hero">
+      <span class="eyebrow"><i aria-hidden="true"></i>企业级智能知识库 · RAG 工作流</span>
+      <h1>让企业知识库自己回答业务问题</h1>
+      <p class="hero-sub">多路召回 · 重排序 · 引用可溯源；检索链路每一步在「阶段进度」中透明呈现。</p>
+      <p class="hero-session">当前会话：<code id="sessionHint">…</code> · 历史记录仅跟随本会话，可随时清空</p>
+    </div>
+  </section>
+
+  <div class="app">
+    <section class="chat-card">
+      <div class="chat" id="chat">
+        <div class="dayline">今天</div>
+        <div class="msg bot">
+          <div class="avatar bot" aria-hidden="true">B</div>
+          <div>
+            <div class="bubble">你好，我是BOSS智库知识库客服。你可以直接提问，我会在“阶段进度”里展示处理过程。</div>
+            <div class="meta">提示：可以问“如何使用万用表测量电压？”</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="comp-grid">
+          <div class="field">
+            <textarea id="input" rows="2" placeholder=" " aria-label="请输入问题"></textarea>
+            <label class="float-label" for="input">请输入问题</label>
+          </div>
+          <div class="keys"><span><span class="kbd">Enter</span> 发送</span><span><span class="kbd">Shift</span>+<span class="kbd">Enter</span> 换行</span></div>
+        </div>
+        <button class="send" id="send" type="button" aria-label="发送问题">发送
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><path d="M2.5 7.5h9M8 3.5l4 4-4 4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // 默认同源；如你把页面单独打开（file://），可改成 http://127.0.0.1:8001
+    const API_BASE = `${location.protocol}//${location.host}`.includes('http') ? `${location.protocol}//${location.host}` : 'http://127.0.0.1:8001';
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const apiPill = document.getElementById('apiPill');
+    const btnClear = document.getElementById('btnClear');
+    const streamToggle = document.getElementById('streamToggle');
+    const statusDot = document.getElementById('statusDot');
+    const acctNameEl = document.getElementById('acctName');
+    const btnLogout = document.getElementById('btnLogout');
+    const sessionHintEl = document.getElementById('sessionHint');
+
+    // Session ID Logic
+    let sessionId = localStorage.getItem('kb_session_id');
+    if (!sessionId) {
+      sessionId = 'sess-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('kb_session_id', sessionId);
+    }
+    if(sessionHintEl) sessionHintEl.textContent = sessionId;
+
+    // ==================== 鉴权（后端已上线：/api/me + /logout，401 一律跳登录） ====================
+    const AUTH_REDIRECT_MSG = 'AUTH_REDIRECT';
+    function redirectToLogin(){
+      location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search);
+    }
+    // 统一 fetch 出口：只对 401 状态码做跳登录；其余非 2xx 原样交回业务分支处理，不误伤错误提示。
+    async function authFetch(url, opts){
+      const res = await fetch(url, opts);
+      if(res.status === 401){
+        redirectToLogin();
+        throw new Error(AUTH_REDIRECT_MSG);
+      }
+      return res;
+    }
+    // EventSource 读不到状态码：传输层断连（无 data 的 error 事件）时探测一次 /api/me，
+    // 若 401 由 authFetch 统一跳登录；2xx/404 均不做任何视觉干预。
+    function probeAuth(){
+      authFetch(`${API_BASE}/api/me`, {credentials:'same-origin'}).catch(() => {});
+    }
+    function isAuthRedirect(err){
+      return !!(err && err.message === AUTH_REDIRECT_MSG);
+    }
+
+    async function loadMe(){
+      try{
+        const res = await authFetch(`${API_BASE}/api/me`, {credentials:'same-origin'});
+        if(!res.ok){ acctNameEl.textContent = '未知'; return; }
+        const data = await res.json().catch(() => null);
+        const name = (data && (data.display_name || data.username)) || '未知';
+        acctNameEl.textContent = name;
+      }catch(e){
+        if(isAuthRedirect(e)) return; // 已在跳转登录
+        acctNameEl.textContent = '未知';
+      }
+    }
+
+    btnLogout.addEventListener('click', async () => {
+      try{
+        const res = await authFetch(`${API_BASE}/logout`, {method:'POST', credentials:'same-origin'});
+        if(res.ok){ location.href = '/login.html'; return; }
+        alert(`服务端退出失败（HTTP ${res.status}），请稍后重试`);
+      }catch(e){
+        if(isAuthRedirect(e)) return; // 401：会话本就失效，authFetch 已在跳登录
+        alert('退出请求失败，请检查网络后重试');
+      }
+    });
+
+    function scrollToBottom(){
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+    function nowTime(){
+      const d = new Date();
+      return d.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+    }
+    function formatTime(ts){
+      if(!ts) return nowTime();
+      const d = new Date(Number(ts) * 1000);
+      if(Number.isNaN(d.getTime())) return nowTime();
+      return d.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+    }
+    function escapeHtml(str){
+      return String(str)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#039;");
+    }
+
+    function isImageUrl(url){
+      // 增加宽松度，有些 url 可能后面跟了奇怪的参数
+      // 只要包含 .jpg .png 等扩展名，且后面是 ? # 或 结束，或者被某些标点截断前
+      // 简单判断：路径部分以图片后缀结尾
+      try {
+        const u = new URL(url);
+        return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(u.pathname);
+      } catch (e) {
+        // 如果 new URL 失败（比如相对路径或非法字符），退回正则匹配
+        return /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(url || '');
+      }
+    }
+
+    function normalizeUrl(rawUrl){
+      const s = String(rawUrl || '').trim();
+      if(!s) return '';
+      // 尽量保留原始 URL，但把空格编码，避免 img src 失败
+      return s.replace(/\s/g, '%20');
+    }
+
+    function dedupeKeepOrder(arr){
+      const seen = new Set();
+      const out = [];
+      for(const x of (Array.isArray(arr) ? arr : [])){
+        const v = String(x || '');
+        if(!v) continue;
+        if(seen.has(v)) continue;
+        seen.add(v);
+        out.push(v);
+      }
+      return out;
+    }
+
+    function extractUrlsLoose(text){
+      const s = String(text || '');
+      // 简单正则提取：匹配 http/https 开头，直到遇到空白字符
+      // [^\s] 包含中文、特殊符号等，直到遇到换行或空格
+      const regex = /(https?:\/\/[^\s]+)/g;
+      const matches = s.match(regex) || [];
+      const urls = [];
+      
+      // 去除首尾标点
+      const trimTailPunct = (u) => String(u || '').replace(/[)\]}'">，。,;；\]】）＞]+$/g, '');
+      const trimHeadPunct = (u) => String(u || '').replace(/^[<([{'"]+|^[＜（【\[]+/g, '');
+
+      for(const m of matches){
+        let u = trimHeadPunct(trimTailPunct(m));
+        // 简单清洗可能混入的结尾
+        if(u) urls.push(u);
+      }
+      return dedupeKeepOrder(urls);
+    }
+
+    function parseImagesFromTextLoosely(text){
+      const urls = extractUrlsLoose(text).filter(isImageUrl);
+      return dedupeKeepOrder(urls);
+    }
+
+    function findLastImageMarkerIndex(raw){
+      const s = String(raw || '');
+      // 支持多种写法：【图片】、【 图片 】、[图片]、[ 图片 ]
+      const re = /【\s*图片\s*】|\[\s*图片\s*\]/g;
+      let m;
+      let lastIdx = -1;
+      let lastLen = 0;
+      while((m = re.exec(s)) !== null){
+        lastIdx = m.index;
+        lastLen = m[0].length;
+      }
+      return { idx: lastIdx, len: lastLen };
+    }
+
+    function parseAnswerAndImages(text){
+      const raw = String(text || '');
+      const { idx, len } = findLastImageMarkerIndex(raw);
+      if(idx === -1) return { text: raw, images: [] };
+
+      const before = raw.slice(0, idx).trimEnd();
+      const after = raw.slice(idx + len).trim();
+      const urls = [];
+
+      // 优先按“每行一个 URL”的方式解析，允许 URL 中包含空格
+      const lines = after.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for(const line of lines){
+        if(line.startsWith('http://') || line.startsWith('https://')){
+          urls.push(line);
+        }else{
+          // 兼容同一行包含多个 URL 的情况
+          const matches = extractUrlsLoose(line);
+          for(const u of matches){
+            urls.push(u);
+          }
+        }
+      }
+
+      // 去重保序 + 过滤图片链接
+      const seen = new Set();
+      const images = [];
+      for(const u of urls){
+        const normalized = normalizeUrl(u);
+        if(!isImageUrl(normalized)) continue;
+        if(seen.has(normalized)) continue;
+        seen.add(normalized);
+        images.push(normalized);
+      }
+      return { text: before, images };
+    }
+
+    function shouldShowImagesByAnswer(answerText){
+      const t = String(answerText || '');
+      // 常见“需要看图/见图/如下图”的表述
+      const keywords = [
+        '如图', '如下图', '见图', '见下图', '下图', '上图',
+        '图片', '示意图', '结构图', '外观', '接线图', '电路图', '原理图', '安装图', '尺寸图', '截图'
+      ];
+      return keywords.some(k => t.includes(k));
+    }
+
+    // ==================== 引用标注 [doc:N] ====================
+    // 后端契约（node_answer_output.build_sources / prompt/answer_prompt）：
+    //   prompt 里每段参考资料以 "[N] [source=..] [chunk_id=..] ..." 开头，
+    //   ANSWER_PROMPT 要求模型在依据某段资料写出的句子末尾标注 [doc:编号]；
+    //   sources = [{"index","ref","chunk_id","source","title","url","score"}]。
+    // 匹配规则：用 index 精确匹配（Number(item.index) === N），不做「按位置 sources[N-1]」匹配。
+    //   为什么：build_sources 的 index 是对「真正进 prompt 的 included_docs」重新从 1 编号，
+    //   而 _format_reranked_docs 的 [N] 是对整份 reranked_docs 编号（正文为空的切片会被跳过
+    //   但编号不回填）——两条链路一旦存在空切片就会错位（已复现，见 web-n3 报告）。
+    //   按位置匹配会把角标链到错误的文档（比不链更糟），按 index 精确匹配最坏只是查不到 →
+    //   降级成不可点击角标，绝不会指错来源。后端不管选哪种修法（prompt 侧连续编号 /
+    //   build_sources 保留原始编号），本规则都成立，因此前端不依赖那个 bug 的修复方向。
+    // index 缺失/非数字时才回退从 ref（"[N]"）抠数字，只兜序列化漂移，不是主匹配路径。
+    const CITATION_RE = /\[\s*doc\s*[:：]\s*(\d{1,3})\s*\]/gi;
+    // 流式残片：结尾仍是「[doc:N] 的合法前缀」的字符（可能被 delta 拆成 "...[doc" + ":3]"）
+    const PARTIAL_CITATION_TAIL_RE = /\[\s*d?\s*(?:o?\s*(?:c?\s*(?:[:：]?\s*\d{0,3}\s*)?)?)?$/i;
+
+    function normalizeSources(sources){
+      // 归一化成 Map<编号, 来源对象>：字段缺失/类型漂移（SSE 打包用 default=str，
+      // score/index 可能是字符串）都在这层吸收掉，渲染层之后不用再判空。
+      const map = new Map();
+      if(!Array.isArray(sources)) return map;
+      for(const item of sources){
+        if(!item || typeof item !== 'object') continue;
+        let n = Number(item.index);
+        if(!Number.isInteger(n) || n <= 0){
+          const m = String(item.ref == null ? '' : item.ref).match(/(\d+)/);
+          n = m ? Number(m[1]) : NaN;
+        }
+        if(!Number.isInteger(n) || n <= 0) continue;
+        if(map.has(n)) continue; // index 本应唯一；重复时保留第一条，避免列表出现两行同编号
+        const url = String(item.url == null ? '' : item.url).trim();
+        // score 显式判空再转数字：Number(null)/Number('') 都等于 0，
+        // 直接 Number 会把「没有打分」渲染成「相关度 0.0000」，误导用户以为这篇完全不相关
+        const rawScore = item.score;
+        const numScore = (rawScore === null || rawScore === undefined || rawScore === '') ? NaN : Number(rawScore);
+        map.set(n, {
+          index: n,
+          chunk_id: String(item.chunk_id == null ? '' : item.chunk_id).trim(),
+          source: String(item.source == null ? '' : item.source).trim().toLowerCase(),
+          title: String(item.title == null ? '' : item.title).trim(),
+          url: /^https?:\/\/\S+$/i.test(url) ? url : '', // 只放行 http(s)，杜绝 javascript:/data: 注入
+          score: numScore,
+        });
+      }
+      return map;
+    }
+
+    function sourceDisplayName(src){
+      // title 兜底链已在后端做完，这里只兜最后一层：全空时退到 chunk_id / url
+      return src.title || src.chunk_id || src.url || '未命名来源';
+    }
+
+    function sourceKindLabel(src){
+      if(src.source === 'web') return '联网';
+      if(src.source === 'local') return '知识库';
+      return src.source || '未知来源';
+    }
+
+    function makeCitationMark(n, srcMap, stripWhenUnknown){
+      const entry = srcMap.get(n);
+      // 降级策略（两种情况分开处理，理由见 renderAnswerWithImages 注释）：
+      //  - 整份 sources 都拿不到 → 删除标记（stripWhenUnknown=true）
+      //  - 有 sources 但这一条编号查不到（模型幻觉越界编号）→ 保留不可点击静态角标
+      if(!entry && stripWhenUnknown) return null;
+      const sup = document.createElement('sup');
+      sup.className = entry ? 'cite cite-live' : 'cite';
+      sup.textContent = String(n);
+      sup.dataset.srcIndex = String(n);
+      if(entry){
+        sup.title = `${sourceKindLabel(entry)} · ${sourceDisplayName(entry)}`;
+        // web 且有安全 url：点击直接开外链；其余（local / 无 url 的 web）点击只做页内定位
+        if(entry.source === 'web' && entry.url) sup.dataset.href = entry.url;
+        sup.setAttribute('role', 'link');
+        sup.setAttribute('tabindex', '0');
+      }
+      return sup;
+    }
+
+    function splitIncompleteCitationTail(text){
+      const s = String(text || '');
+      const m = s.match(PARTIAL_CITATION_TAIL_RE);
+      if(!m) return s;
+      // 只有确实是 "[" 开头的残片才扣留（正则已保证），普通中括号文本不受影响
+      return s.slice(0, m.index);
+    }
+
+    function appendAnswerTextWithCitations(parentEl, text, srcMap, streaming){
+      const raw = String(text || '');
+      // 有 sources 时 srcMap 就是权威来源表，查不到的编号才降级成静态角标；
+      // 完全没有 sources 时：流式阶段先按静态角标渲染（final 会补齐，尺寸一致不跳动），
+      // 终态（final/done/历史）则删掉标记。
+      const stripWhenUnknown = !streaming && srcMap.size === 0;
+      let body = raw;
+      if(streaming){
+        // 流式整段重渲染：结尾若是一个还没收全的标记（"[doc" / "[doc:" / "[doc:1"），
+        // 这一帧先不显示，等下一个 delta 补齐再整体渲染 —— 用户永远不会看到半个坏标记。
+        // 终态不扣留，保证最后一个残片也走上面的降级逻辑，不会凭空吞字。
+        body = splitIncompleteCitationTail(raw);
+      }
+      CITATION_RE.lastIndex = 0;
+      let last = 0;
+      let m;
+      while((m = CITATION_RE.exec(body)) !== null){
+        if(m.index > last) parentEl.appendChild(document.createTextNode(body.slice(last, m.index)));
+        const mark = makeCitationMark(Number(m[1]), srcMap, stripWhenUnknown);
+        if(mark) parentEl.appendChild(mark);
+        last = m.index + m[0].length;
+      }
+      if(last < body.length) parentEl.appendChild(document.createTextNode(body.slice(last)));
+    }
+
+    function bindCitationClicks(containerEl){
+      // 事件委托挂在 answer 容器上：每次重渲染只是换掉子节点，容器本身不变，
+      // 所以监听器只绑一次（绑在每个 sup 上会在每次 delta 重渲染时反复泄漏/丢失）。
+      if(containerEl.__citeBound) return;
+      containerEl.__citeBound = true;
+      const onClick = (ev) => {
+        const sup = ev.target && ev.target.closest ? ev.target.closest('.cite-live[data-src-index]') : null;
+        if(!sup || !containerEl.contains(sup)) return;
+        ev.preventDefault();
+        const href = sup.dataset.href;
+        if(href){
+          window.open(href, '_blank', 'noopener,noreferrer');
+          return;
+        }
+        // local（或 web 无 url）：定位到本条消息下方的「参考来源」并高亮，展示 title / chunk_id
+        const li = containerEl.querySelector(`.answer-sources li[data-src-index="${sup.dataset.srcIndex}"]`);
+        if(!li) return;
+        li.scrollIntoView({behavior:'smooth', block:'nearest'});
+        li.classList.remove('flash');
+        void li.offsetWidth; // 强制重排，让同一角标连点也能重放高亮动画
+        li.classList.add('flash');
+      };
+      containerEl.addEventListener('click', onClick);
+      containerEl.addEventListener('keydown', (ev) => {
+        if(ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') onClick(ev);
+      });
+    }
+
+    // 阶段进度图标：完成态 --ok、进行中 blurple（05 设计语言），纯内联 SVG，无外链。
+    const P_ICON_DONE = '<svg class="p-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="7" fill="#0ED47E" opacity=".16"/><path d="M4.5 7.8l2 2 4-4.6" fill="none" stroke="#067A46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const P_ICON_RUN = '<svg class="p-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="6.4" fill="none" stroke="#635BFF" stroke-width="1.6"/><path d="M7.5 4.6v3.2l2 1.4" fill="none" stroke="#635BFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function renderSourceList(containerEl, srcMap){
+      // 只有拿到 sources 才渲染列表；没有就不输出（避免历史里挂一个空壳「参考来源」）
+      if(!srcMap || srcMap.size === 0) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'answer-sources';
+      const head = document.createElement('div');
+      head.className = 'src-head';
+      head.textContent = `参考来源（${srcMap.size}）`;
+      wrap.appendChild(head);
+
+      const ul = document.createElement('ul');
+      ul.className = 'srcs';
+      const nums = Array.from(srcMap.keys()).sort((a, b) => a - b);
+      for(const n of nums){
+        const src = srcMap.get(n);
+        const li = document.createElement('li');
+        li.className = 'src';
+        li.dataset.srcIndex = String(n); // 供角标点击定位
+
+        const no = document.createElement('span');
+        no.className = 's-no';
+        no.textContent = `[${n}]`;
+        li.appendChild(no);
+
+        const main = document.createElement('div');
+        main.className = 's-main';
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 's-title';
+        if(src.source === 'web' && src.url){
+          const a = document.createElement('a');
+          a.href = src.url; // normalizeSources 已限定 http(s)
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = sourceDisplayName(src);
+          titleEl.appendChild(a);
+        }else{
+          titleEl.textContent = sourceDisplayName(src);
+        }
+        main.appendChild(titleEl);
+
+        const meta = document.createElement('div');
+        meta.className = 's-meta';
+
+        const tag = document.createElement('span');
+        tag.className = 'tag ' + (src.source === 'web' ? 'tag-web' : (src.source === 'local' ? 'tag-kb' : 'tag-other'));
+        tag.textContent = sourceKindLabel(src);
+        meta.appendChild(tag);
+
+        // 本地来源没有外链可点，把 chunk_id 摊出来，用户才能拿它回向量库/导入页核对原文
+        if(src.chunk_id){
+          const code = document.createElement('code');
+          code.textContent = `chunk_id=${src.chunk_id}`;
+          meta.appendChild(code);
+        }else if(src.source === 'web' && src.url){
+          const code = document.createElement('code');
+          try{ code.textContent = new URL(src.url).hostname; }catch(_){ code.textContent = '外部链接'; }
+          meta.appendChild(code);
+        }
+
+        if(Number.isFinite(src.score)){
+          const rel = document.createElement('span');
+          rel.className = 'rel';
+          const small = document.createElement('small');
+          small.textContent = '相关度';
+          rel.appendChild(small);
+          rel.appendChild(document.createTextNode(src.score.toFixed(4)));
+          meta.appendChild(rel);
+        }
+        main.appendChild(meta);
+        li.appendChild(main);
+        ul.appendChild(li);
+      }
+      wrap.appendChild(ul);
+      containerEl.appendChild(wrap);
+    }
+
+    function renderAnswerWithImages(containerEl, answerText, candidateImageUrls, sources, opts){
+      const options = opts || {};
+      const { text, images: imagesFromBlock } = parseAnswerAndImages(answerText);
+      const candidates = Array.isArray(candidateImageUrls)
+        ? candidateImageUrls.map(normalizeUrl).filter(isImageUrl)
+        : [];
+      const hasBlockImages = imagesFromBlock && imagesFromBlock.length > 0;
+      
+      // 使用宽松提取
+      const looseImages = extractUrlsLoose(answerText).map(normalizeUrl).filter(isImageUrl);
+      
+      // 只要后端给了候选图片，就展示（避免答案没写“如图”但用户仍需要看图）
+      // 或者从文本里提取到了图片 URL
+      const shouldShow = hasBlockImages || (candidates.length > 0) || (looseImages.length > 0);
+      
+      // 优先级：Block 显式标记 > 后端候选 > 文本宽松提取
+      // 注意：这里做个并集可能更好，防止漏掉
+      const allImages = new Set([
+          ...(hasBlockImages ? imagesFromBlock : []),
+          ...candidates,
+          ...looseImages
+      ]);
+      const images = Array.from(allImages);
+
+      // 引用来源：SSE final / 非流式 /query 的 sources 字段（字段契约见 node_answer_output）
+      const srcMap = normalizeSources(sources);
+
+      containerEl.textContent = '';
+
+      if((text || '').trim().length > 0){
+        const textEl = document.createElement('div');
+        textEl.className = 'answer-text';
+        appendAnswerTextWithCitations(textEl, text, srcMap, !!options.streaming);
+        containerEl.appendChild(textEl);
+        bindCitationClicks(containerEl);
+      }else{
+        const textEl = document.createElement('div');
+        textEl.className = 'answer-text';
+        textEl.textContent = '（已完成，但未返回答案）';
+        containerEl.appendChild(textEl);
+      }
+
+      if(images && images.length > 0){
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'answer-images';
+        for(const url of images){
+          const safeUrl = normalizeUrl(url);
+          const img = document.createElement('img');
+          img.loading = 'lazy';
+          img.src = safeUrl;
+          img.alt = '参考图片';
+          img.referrerPolicy = 'no-referrer';
+          img.addEventListener('error', () => {
+            img.style.display = 'none';
+          });
+          imgWrap.appendChild(img);
+
+          const link = document.createElement('a');
+          link.href = safeUrl;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = url;
+          imgWrap.appendChild(link);
+        }
+        containerEl.appendChild(imgWrap);
+      }
+
+      // 「参考来源」列表：流式阶段 sources 还没到（final 才带），不渲染空壳，
+      // 等 final 一次性出现，避免列表先空后有导致的跳动。
+      if(!options.streaming) renderSourceList(containerEl, srcMap);
+
+      // 追问确认交互：若这是商品名不明确时的反问句，渲染可点击型号标签
+      maybeRenderConfirmOptions(containerEl, text);
+    }
+
+    function maybeRenderConfirmOptions(containerEl, answerText){
+      // 与 node_item_name_confirm 分支B的反问句式对齐：
+      // "您是想问以下哪个产品：A、B、C？请明确一下型号。"
+      const t = String(answerText || '');
+      const m = t.match(/您是想问以下哪个产品[:：]\s*([\s\S]*?)\s*[?？]/);
+      if(!m) return;
+      const opts = m[1].split(/[、,，]/).map(s => s.trim()).filter(Boolean);
+      if(opts.length === 0) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'confirm-options';
+      const tip = document.createElement('div');
+      tip.className = 'meta';
+      tip.textContent = '点击选择一个型号：';
+      wrap.appendChild(tip);
+
+      const row = document.createElement('div');
+      row.className = 'confirm-chips';
+      for(const opt of opts){
+        const b = document.createElement('button');
+        b.className = 'chip';
+        b.type = 'button';
+        b.textContent = opt;
+        b.addEventListener('click', () => {
+          // 复用当前 sessionId，保证同一会话多轮/多图上下文一致
+          inputEl.value = opt;
+          inputEl.focus();
+        });
+        row.appendChild(b);
+      }
+      wrap.appendChild(row);
+      containerEl.appendChild(wrap);
+    }
+
+    function addUserMsg(text){
+      const html = `
+        <div class="msg user">
+          <div>
+            <div class="bubble">${escapeHtml(text)}</div>
+            <div class="meta">${nowTime()}</div>
+          </div>
+          <div class="avatar">我</div>
+        </div>
+      `;
+      chatEl.insertAdjacentHTML('beforeend', html);
+      scrollToBottom();
+    }
+
+    function addUserMsgWithTime(text, ts){
+      const html = `
+        <div class="msg user">
+          <div>
+            <div class="bubble">${escapeHtml(text)}</div>
+            <div class="meta">${formatTime(ts)}</div>
+          </div>
+          <div class="avatar">我</div>
+        </div>
+      `;
+      chatEl.insertAdjacentHTML('beforeend', html);
+      scrollToBottom();
+    }
+
+    function addBotMsgWithTime(text, ts, imageUrls, sources){
+      const id = 'bot-his-' + Math.random().toString(36).slice(2);
+      const html = `
+        <div class="msg bot" id="${id}">
+          <div class="avatar bot" aria-hidden="true">B</div>
+          <div>
+            <div class="bubble"><div class="answer"></div></div>
+            <div class="meta">${formatTime(ts)}</div>
+          </div>
+        </div>
+      `;
+      chatEl.insertAdjacentHTML('beforeend', html);
+      const el = document.getElementById(id);
+      if(el){
+        const answerEl = el.querySelector('.answer');
+        // 历史还原：Mongo 目前不落 sources，sources 为空 → 渲染层走「删标记」降级，
+        // 绝不让用户看到原始 [doc:3]。将来 /history 带上 sources 时这里无需改动。
+        renderAnswerWithImages(answerEl, text || '', imageUrls || [], sources || []);
+      }
+      scrollToBottom();
+    }
+
+    function addBotMsgSkeleton(){
+      const id = 'bot-' + Math.random().toString(36).slice(2);
+      const html = `
+        <div class="msg bot" id="${id}">
+          <div class="avatar bot" aria-hidden="true">B</div>
+          <div style="min-width: 180px;">
+            <div class="bubble">
+              <span class="typing"><span class="dot-t"></span><span class="dot-t"></span><span class="dot-t"></span></span>
+              <details class="progress" open>
+                <summary>阶段进度（等待中）</summary>
+                <ul></ul>
+              </details>
+            </div>
+            <div class="meta">${nowTime()}</div>
+          </div>
+        </div>
+      `;
+      chatEl.insertAdjacentHTML('beforeend', html);
+      scrollToBottom();
+      return document.getElementById(id);
+    }
+
+    function renderProgress(botMsgEl, doneList, runningList, status){
+      const details = botMsgEl.querySelector('details.progress');
+      const summary = details.querySelector('summary');
+      const ul = details.querySelector('ul');
+      const done = Array.isArray(doneList) ? doneList : [];
+      const running = Array.isArray(runningList) ? runningList : [];
+      const totalDone = done.length;
+      const totalRun = running.length;
+
+      const statusMap = {
+        'processing': '处理中',
+        'completed': '已完成',
+        'failed': '失败',
+        'pending': '等待中',
+      };
+      const displayStatus = statusMap[status] || status || 'unknown';
+
+      summary.textContent = `阶段进度（已完成${totalDone}，进行中${totalRun}，状态：${displayStatus}）`;
+
+      ul.innerHTML = '';
+      if(done.length + running.length === 0){
+        ul.insertAdjacentHTML('beforeend', '<li>暂无进度</li>');
+      }else{
+        for(const line of done){
+          ul.insertAdjacentHTML('beforeend', `<li>${P_ICON_DONE}${escapeHtml(line)}</li>`);
+        }
+        for(const line of running){
+          ul.insertAdjacentHTML('beforeend', `<li>${P_ICON_RUN}${escapeHtml(line)}</li>`);
+        }
+      }
+    }
+
+    function finalizeBotAnswer(botMsgEl, answer, error, imageUrls, sources){
+      const bubble = botMsgEl.querySelector('.bubble');
+      const progress = botMsgEl.querySelector('details.progress');
+      const err = (error || '').trim();
+
+      if(err){
+        const progressEl = progress ? progress : null;
+        if(progressEl) {
+            progressEl.remove();
+            progressEl.removeAttribute('open');
+        }
+        bubble.textContent = '';
+        const errEl = document.createElement('div');
+        errEl.className = 'answer answer-error';
+        errEl.textContent = `抱歉，本次处理失败：\n${err}`;
+        bubble.appendChild(errEl);
+        if(progressEl) bubble.appendChild(progressEl);
+        return;
+      }
+
+      const progressEl = progress ? progress : null;
+      if(progressEl) {
+        progressEl.remove();
+        progressEl.removeAttribute('open'); // 完成后自动收起
+      }
+      bubble.textContent = '';
+      const answerEl = document.createElement('div');
+      answerEl.className = 'answer';
+      bubble.appendChild(answerEl);
+      renderAnswerWithImages(answerEl, answer || '', imageUrls || [], sources || []);
+      if(progressEl) bubble.appendChild(progressEl);
+    }
+
+    async function apiHealth(){
+      try{
+        const res = await authFetch(`${API_BASE}/health`);
+        if(!res.ok) throw new Error('health not ok');
+        apiPill.textContent = `API: 已连接`;
+        if(statusDot) statusDot.classList.remove('off');
+      }catch(e){
+        if(isAuthRedirect(e)) return; // 401：正在跳登录，不改业务文案
+        apiPill.textContent = `API: 未连接`;
+        if(statusDot) statusDot.classList.add('off');
+      }
+    }
+
+    async function loadHistory(){
+      try{
+        const res = await authFetch(`${API_BASE}/history/${sessionId}`);
+        if(!res.ok) return;
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        if(items.length === 0) return;
+        // 保留首条欢迎消息，其余先清空再渲染历史
+        const nodes = Array.from(chatEl.querySelectorAll('.msg'));
+        for(let i=1;i<nodes.length;i++) nodes[i].remove();
+        for(const item of items){
+          if(item.role === 'user'){
+            addUserMsgWithTime(item.text || '', item.ts);
+          }else{
+            addBotMsgWithTime(item.text || '', item.ts, item.image_urls || [], item.sources || []);
+          }
+        }
+        scrollToBottom();
+      }catch(_){}
+    }
+
+    async function submitQuery(text){
+      const isStream = streamToggle.checked;
+      const res = await authFetch(`${API_BASE}/query`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          query: text,
+          session_id: sessionId,
+          is_stream: isStream
+        })
+      });
+      if(!res.ok){
+        const msg = await res.text();
+        throw new Error(msg || '请求失败');
+      }
+      return await res.json();
+    }
+
+    async function onSend(){
+      console.log('[perf] A onSend start', performance.now());
+      const text = (inputEl.value || '').trim();
+      if(!text) return;
+      inputEl.value = '';
+      addUserMsg(text);
+      const botMsgEl = addBotMsgSkeleton();
+      sendBtn.disabled = true;
+
+      try{
+        const isStream = streamToggle.checked;
+        console.log('[perf] B submitQuery start', performance.now(), { isStream });
+        const data = await submitQuery(text);
+        console.log('[perf] B submitQuery end', performance.now(), data);
+        
+        // 渲染初始状态
+        renderProgress(botMsgEl, [], [], 'pending');
+
+        if (!isStream) {
+          // 非流式：直接拿到结果
+          // data: { session_id, answer, done_list, error, message, image_urls, item_names, sources }
+          renderProgress(botMsgEl, data.done_list || [], [], 'completed');
+          finalizeBotAnswer(botMsgEl, data.answer, data.error, data.image_urls || [], data.sources || []);
+          sendBtn.disabled = false;
+          return;
+        }
+
+        // 流式：SSE
+        const { session_id } = data; // 此时 backend 返回 session_id
+        
+        const bubble = botMsgEl.querySelector('.bubble');
+        let answerEl = bubble.querySelector('.answer');
+        if(!answerEl){
+          answerEl = document.createElement('div');
+          answerEl.className = 'answer';
+          bubble.insertBefore(answerEl, bubble.firstChild);
+        }
+
+        const es = new EventSource(`${API_BASE}/stream/${session_id}`);
+        console.log('[perf] C EventSource created', performance.now(), { session_id });
+        let rawAnswerText = '';
+        // 引用来源：只有 final 才带 sources，流式期间是空数组。
+        // 渲染层在 streaming=true 时把 [doc:N] 先画成「静态角标」（尺寸与可点击版完全一致），
+        // final 到达后原地升级为可点击角标 —— 因此不会出现「先见原始 [doc:3] 再变角标」的闪烁，
+        // 也不会有文字重排跳动。
+        let streamSources = [];
+        // 记住最后一次 progress 的节点列表：final/done 到达时后端不会再发 progress，
+        // 若不缓存，进度面板会永远停在最后一次推送的「处理中」。
+        let lastDoneList = [], lastRunList = [];
+
+        es.addEventListener('progress', (e) => {
+          try{
+            const d = JSON.parse(e.data || '{}');
+            lastDoneList = d.done_list || [];
+            lastRunList = d.running_list || [];
+            renderProgress(botMsgEl, d.done_list, d.running_list, d.status);
+            // 当进度状态已完成时，提前结束“...”等待态
+            if(d && d.status === 'completed'){
+              const typing = botMsgEl.querySelector('.typing');
+              if(typing) typing.remove();
+              // 防止后端未发送 final 导致按钮一直禁用
+              sendBtn.disabled = false;
+            }
+          }catch(_){}
+        });
+
+        es.addEventListener('delta', (e) => {
+          try{
+            const d = JSON.parse(e.data || '{}');
+            const delta = d.delta || '';
+            if(delta){
+              rawAnswerText += delta;
+              // 即使后端未发送 final，也尽可能在流式过程中渲染图片
+              // streaming:true：引用标记按静态角标渲染，并扣留结尾没收全的半个标记
+              renderAnswerWithImages(answerEl, rawAnswerText, [], streamSources, {streaming:true});
+              scrollToBottom();
+            }
+          }catch(_){}
+        });
+
+        es.addEventListener('final', (e) => {
+          const typing = botMsgEl.querySelector('.typing');
+          if(typing) typing.remove();
+          // 收起进度条
+          const progress = botMsgEl.querySelector('details.progress');
+          if(progress) progress.removeAttribute('open');
+          // final 之后后端不再发 progress，这里把状态标签刷成「已完成」
+          renderProgress(botMsgEl, lastDoneList, [], 'completed');
+          
+          try{
+            const d = JSON.parse(e.data || '{}');
+            // 引用来源以 final 为准（build_sources 的产物，index 与答案里的 [doc:N] 对齐）
+            streamSources = Array.isArray(d.sources) ? d.sources : [];
+            // 流式 delta 可能不包含“【图片】/图片列表”，最终包的 d.answer 才是完整答案；优先使用 d.answer
+            const finalText = (d && typeof d.answer === 'string' && d.answer.trim().length > 0) ? d.answer : (rawAnswerText || answerEl.textContent || '');
+            // 终态渲染（streaming 缺省 = false）：角标升级为可点击 + 补上「参考来源」列表
+            renderAnswerWithImages(answerEl, finalText, d.image_urls || [], streamSources);
+          }catch(_){}
+          es.close();
+          sendBtn.disabled = false;
+        });
+
+        // done：服务端收到内部 CLOSE 后补发的兜底终止帧（sse_utils）。
+        // 为什么需要它：前端主要靠 final 关闭 EventSource，一旦 final 丢失
+        // （图异常/提前结束），连接会永久挂住。done 保证任何情况下都能收尾。
+        es.addEventListener('done', () => {
+          const typing = botMsgEl.querySelector('.typing');
+          if(typing) typing.remove();
+          const progress = botMsgEl.querySelector('details.progress');
+          if(progress) progress.removeAttribute('open');
+          // final 缺失时的兜底：状态标签同样刷成「已完成」
+          renderProgress(botMsgEl, lastDoneList, [], 'completed');
+          // 若此前没渲染过答案（final 缺失），用已收到的流式增量兜底渲染
+          // 终态渲染：此时确定没有 sources，[doc:N] 走「删标记」降级，不留原始标记给用户
+          if(answerEl && !answerEl.textContent.trim() && rawAnswerText){
+            renderAnswerWithImages(answerEl, rawAnswerText, [], streamSources);
+          }
+          es.close();
+          sendBtn.disabled = false;
+        });
+
+        es.addEventListener('final_answer', (e) => {
+           // 响应用户的 final_answer 信号，确保图片渲染
+          const typing = botMsgEl.querySelector('.typing');
+          if(typing) typing.remove();
+          const progress = botMsgEl.querySelector('details.progress');
+          if(progress) progress.removeAttribute('open');
+          
+          try{
+            const d = JSON.parse(e.data || '{}');
+            streamSources = Array.isArray(d.sources) ? d.sources : streamSources;
+            const finalText = (d && typeof d.answer === 'string' && d.answer.trim().length > 0) ? d.answer : (rawAnswerText || answerEl.textContent || '');
+            renderAnswerWithImages(answerEl, finalText, d.image_urls || [], streamSources);
+          }catch(_){}
+          es.close();
+          sendBtn.disabled = false;
+        });
+
+        es.addEventListener('error', (e) => {
+          const typing = botMsgEl.querySelector('.typing');
+          if(typing) typing.remove();
+          // 收起进度条
+          const progress = botMsgEl.querySelector('details.progress');
+          if(progress) progress.removeAttribute('open');
+
+          // 无 data 的是传输层错误（401 拒绝也长这样）：探测 /api/me，若 401 由 authFetch 跳登录。
+          // 有 data 的是后端业务 error 事件帧，走原提示逻辑，不误伤。
+          if(!e || !e.data) probeAuth();
+
+          try{
+            const msg = e && e.data ? (JSON.parse(e.data).error || 'SSE 连接中断/失败') : 'SSE 连接中断/失败';
+            rawAnswerText += `\n\n（错误：${msg}）`;
+            renderAnswerWithImages(answerEl, rawAnswerText, [], streamSources);
+          }catch(_){
+            rawAnswerText += `\n\n（错误：SSE 连接中断/失败）`;
+            renderAnswerWithImages(answerEl, rawAnswerText, [], streamSources);
+          }
+          es.close();
+          sendBtn.disabled = false;
+        });
+      }catch(e){
+        if(isAuthRedirect(e)){ sendBtn.disabled = false; return; } // 正在跳登录，不渲染业务失败
+        const bubble = botMsgEl.querySelector('.bubble');
+        const progress = botMsgEl.querySelector('details.progress');
+        const typing = botMsgEl.querySelector('.typing');
+        if(typing) typing.remove();
+        bubble.innerHTML = `请求失败：${escapeHtml(e.message || e)}\n\n` + progress.outerHTML;
+        sendBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener('click', onSend);
+    inputEl.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        onSend();
+      }
+    });
+    btnClear.addEventListener('click', async () => {
+      if(!confirm('确定要清空当前会话的历史记录吗？这将无法恢复。')) return;
+
+      try {
+        const res = await authFetch(`${API_BASE}/history/${sessionId}`, { method: 'DELETE' });
+        if(!res.ok) {
+           console.error("Failed to clear history backend, status:", res.status);
+           alert('服务端清空失败，仅清空本地显示');
+        }
+      } catch(e) {
+        if(isAuthRedirect(e)) return; // 401：正在跳登录
+        console.error("Failed to clear history backend", e);
+        alert('服务端清空失败，仅清空本地显示');
+      }
+
+      // 清空除首条欢迎消息外的内容
+      const nodes = Array.from(chatEl.querySelectorAll('.msg'));
+      for(let i=1;i<nodes.length;i++) nodes[i].remove();
+      scrollToBottom();
+    });
+
+    apiHealth();
+    setInterval(apiHealth, 5000);
+    loadHistory();
+    loadMe();
+    setTimeout(() => inputEl.focus(), 200);
+  </script>
+</body>
+</html>

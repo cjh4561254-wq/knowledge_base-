@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<!--
+  方案编号：05
+  风格名：Stripe 金融科技流体渐变风
+  负责子智能体：Sub-Agent-Stripe-Mesh（主页面视图 · Mesh Gradient 背景与斜切分区）
+  设计系统要点：
+  1) 纯 CSS 多层 radial-gradient 静态叠出 Stripe 招牌网格渐变（blurple #635BFF + #00D4FF/#A960FF/#FF5C99 柔光椭圆 + 倾斜 linear-gradient 压暗），零 GPU、无 blur 大图层、无持续 @keyframes。
+  2) hero 与内容区之间用 clip-path polygon 做 3~5 度斜切边界（--cut 变量控制，窄屏减弱角度）。
+  3) 超柔和三层投影体系：0 1px 2px / 0 8px 24px / 0 24px 48px（rgba(10,37,64,.06~.08)），hover 抬升 4px 并加深中间层；圆角 8~12px，标题 700/800，数字 tabular-nums 金额式对齐。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案05 · Stripe 金融科技流体渐变风 · BOSS智库知识库</title>
+<style>
+/* ========== tokens ========== */
+:root{
+  --blurple:#635BFF; --blurple-deep:#4F46E5; --cyan:#00D4FF; --purple:#A960FF; --pink:#FF5C99;
+  --ink:#0A2540; --sub:#425466; --body:#1A1F36;
+  --page:#FFFFFF; --page-alt:#F6FBFF;
+  --ok:#0ED47E; --err:#DF1B51;
+  --line:rgba(10,37,64,.10); --line-soft:rgba(10,37,64,.06);
+  --r-sm:8px; --r-md:10px; --r-lg:12px;
+  --sh:0 1px 2px rgba(10,37,64,.06), 0 8px 24px rgba(10,37,64,.08), 0 24px 48px rgba(10,37,64,.06);
+  --sh-hover:0 1px 2px rgba(10,37,64,.06), 0 14px 36px rgba(10,37,64,.14), 0 28px 56px rgba(10,37,64,.08);
+  --cut:clamp(44px, 5.2vw, 96px);
+  --sans:-apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --mono:"SFMono-Regular", Consolas, "Cascadia Mono", monospace;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans); color:var(--body); background:var(--page);
+  line-height:1.6; overflow-x:hidden;
+}
+button{font-family:inherit; cursor:pointer}
+:focus-visible{outline:3px solid rgba(99,91,255,.65); outline-offset:2px; border-radius:6px}
+.num{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+
+/* ========== hero：mesh gradient + 斜切 ========== */
+.hero-wrap{
+  position:relative;
+  background:
+    radial-gradient(42% 58% at 10% 14%, rgba(99,91,255,.58), transparent 66%),
+    radial-gradient(34% 50% at 38% 4%,  rgba(0,212,255,.40),  transparent 64%),
+    radial-gradient(44% 62% at 76% 20%, rgba(169,96,255,.52), transparent 66%),
+    radial-gradient(36% 48% at 95% 72%, rgba(255,92,153,.42), transparent 64%),
+    linear-gradient(115deg, #0A2540 0%, #131b4d 46%, #1c2154 78%, #0A2540 100%);
+  clip-path:polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), 0 100%);
+  padding-bottom:calc(var(--cut) + 28px);
+  color:#fff;
+}
+.nav{
+  max-width:1200px; margin:0 auto; padding:20px 32px 0;
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+}
+.nav-inner{
+  display:flex; align-items:center; gap:16px; width:100%;
+  background:rgba(10,37,64,.42); border:1px solid rgba(255,255,255,.14);
+  border-radius:var(--r-lg); padding:10px 18px;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); /* 仅顶栏一处毛玻璃 */
+}
+.logo{display:flex; align-items:center; gap:10px; font-weight:800; font-size:17px; letter-spacing:.2px}
+.logo svg{flex:none}
+.status{display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(255,255,255,.82)}
+.dot{width:8px; height:8px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 3px rgba(14,212,126,.25)}
+.nav-sp{flex:1}
+.nav-actions{display:flex; align-items:center; gap:10px}
+.ghost-btn{
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25); color:#fff;
+  border-radius:var(--r-sm); padding:7px 14px; font-size:13px; font-weight:600;
+  transition:background .2s, transform .2s;
+}
+.ghost-btn:hover{background:rgba(255,255,255,.16); transform:translateY(-1px)}
+.hero{max-width:1200px; margin:0 auto; padding:56px 32px 8px}
+.eyebrow{
+  display:inline-flex; align-items:center; gap:8px;
+  border:1px solid rgba(255,255,255,.28); background:rgba(255,255,255,.08);
+  border-radius:999px; padding:6px 14px; font-size:13px; font-weight:600; color:rgba(255,255,255,.9);
+}
+.eyebrow i{width:8px; height:8px; border-radius:2px; background:linear-gradient(135deg,var(--cyan),var(--blurple))}
+h1{font-size:clamp(30px, 4.6vw, 48px); font-weight:800; line-height:1.2; margin:18px 0 14px; letter-spacing:.5px}
+.hero-sub{font-size:17px; color:rgba(255,255,255,.78); max-width:640px; font-weight:400}
+.hero-cta{display:flex; gap:14px; margin-top:30px; flex-wrap:wrap}
+.solid-btn{
+  background:var(--blurple); border:none; color:#fff; border-radius:var(--r-sm);
+  padding:12px 24px; font-size:15px; font-weight:700; box-shadow:var(--sh);
+  transition:transform .2s, box-shadow .2s, background .2s;
+}
+.solid-btn:hover{transform:translateY(-2px); background:#5750F1; box-shadow:var(--sh-hover)}
+.solid-btn:active{transform:translateY(0)}
+.outline-btn{
+  background:transparent; border:1.5px solid rgba(255,255,255,.55); color:#fff;
+  border-radius:var(--r-sm); padding:11px 22px; font-size:15px; font-weight:700;
+  transition:background .2s, transform .2s;
+}
+.outline-btn:hover{background:rgba(255,255,255,.12); transform:translateY(-2px)}
+.hero-meta{display:flex; gap:26px; margin-top:34px; flex-wrap:wrap; font-size:13px; color:rgba(255,255,255,.68)}
+.hero-meta b{color:#fff; font-weight:700; font-size:15px; margin-right:6px}
+
+/* ========== main ========== */
+main{max-width:1200px; margin:0 auto; padding:8px 32px 40px}
+.tabs{display:flex; gap:8px; margin:0 0 22px; background:var(--page-alt); border:1px solid var(--line); border-radius:var(--r-lg); padding:6px; width:max-content}
+.tab{
+  border:none; background:transparent; border-radius:var(--r-sm); padding:10px 22px;
+  font-size:15px; font-weight:700; color:var(--sub); transition:all .2s;
+  display:flex; align-items:center; gap:8px;
+}
+.tab[aria-selected="true"]{background:#fff; color:var(--blurple-deep); box-shadow:0 1px 2px rgba(10,37,64,.08), 0 4px 12px rgba(10,37,64,.08)}
+.tab:hover:not([aria-selected="true"]){color:var(--ink)}
+.card{background:#fff; border:1px solid var(--line-soft); border-radius:var(--r-lg); box-shadow:var(--sh)}
+.panel[hidden]{display:none}
+
+/* ---------- chat ---------- */
+.chat-head{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:16px 22px; border-bottom:1px solid var(--line-soft);
+}
+.chat-title{font-size:16px; font-weight:800; color:var(--ink); display:flex; align-items:center; gap:9px}
+.chat-head .status{color:var(--sub)}
+.chat-head .dot{box-shadow:0 0 0 3px rgba(14,212,126,.18)}
+.head-sp{flex:1}
+.switch{display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--sub); font-weight:600; cursor:pointer}
+.switch input{position:absolute; opacity:0; width:0; height:0}
+.track{width:38px; height:22px; border-radius:999px; background:rgba(10,37,64,.22); position:relative; transition:background .2s}
+.track::after{content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(10,37,64,.3); transition:left .2s}
+.switch input:checked + .track{background:var(--blurple)}
+.switch input:checked + .track::after{left:19px}
+.switch input:focus-visible + .track{outline:3px solid rgba(99,91,255,.65); outline-offset:2px}
+.danger-ghost{
+  border:1px solid rgba(223,27,81,.35); color:var(--err); background:#fff;
+  border-radius:var(--r-sm); padding:7px 14px; font-size:13px; font-weight:700; transition:background .2s;
+}
+.danger-ghost:hover{background:rgba(223,27,81,.06)}
+.msgs{padding:24px 22px; max-height:640px; overflow-y:auto}
+.welcome{
+  background:var(--page-alt); border:1px dashed rgba(99,91,255,.4); border-radius:var(--r-md);
+  padding:16px 18px; font-size:14px; color:var(--ink); margin-bottom:22px;
+}
+.welcome .hint{margin-top:6px; color:var(--sub); font-size:13px}
+.welcome .hint b{color:var(--blurple-deep)}
+.msg{display:flex; gap:14px; margin-bottom:22px}
+.msg.user{justify-content:flex-end}
+.bubble-u{
+  background:linear-gradient(135deg, var(--blurple) 0%, #7B6CFF 100%); color:#fff;
+  border-radius:12px 12px 3px 12px; padding:12px 18px; max-width:min(560px, 78%);
+  font-size:14.5px; box-shadow:0 1px 2px rgba(10,37,64,.1), 0 6px 18px rgba(99,91,255,.28);
+}
+.time{font-size:12px; color:rgba(255,255,255,.75); margin-top:6px; text-align:right; font-variant-numeric:tabular-nums}
+.avatar{
+  flex:none; width:38px; height:38px; border-radius:var(--r-sm);
+  background:linear-gradient(135deg, var(--blurple), var(--purple) 60%, var(--pink));
+  display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:14px;
+  box-shadow:0 1px 2px rgba(10,37,64,.1), 0 6px 16px rgba(99,91,255,.25);
+}
+.msg-b{min-width:0; flex:1}
+.b-name{font-size:13px; font-weight:800; color:var(--ink); margin-bottom:6px}
+.b-name time{font-weight:400; color:var(--sub); margin-left:8px; font-variant-numeric:tabular-nums}
+.answer{font-size:14.5px; color:var(--body); margin-bottom:4px}
+.answer p{margin-bottom:8px}
+.answer ol{margin:0 0 10px 22px}
+.answer li{margin-bottom:5px}
+.answer code{font-family:var(--mono); font-size:12.5px; background:rgba(99,91,255,.09); color:var(--blurple-deep); border-radius:5px; padding:1px 6px}
+.cite{
+  display:inline-flex; align-items:center; justify-content:center; vertical-align:super;
+  min-width:19px; height:19px; padding:0 4px; margin:0 2px;
+  border:1.5px solid var(--blurple); border-radius:6px; background:rgba(99,91,255,.06);
+  color:var(--blurple-deep); font-size:11.5px; font-weight:800; font-variant-numeric:tabular-nums;
+  transition:background .2s, transform .2s;
+}
+.cite:hover{background:var(--blurple); color:#fff; transform:translateY(-2px)}
+.sec-t{font-size:13.5px; font-weight:800; color:var(--ink); margin:18px 0 10px; display:flex; align-items:center; gap:8px}
+.sec-t .bar{width:4px; height:14px; border-radius:2px; background:linear-gradient(180deg, var(--blurple), var(--cyan))}
+
+/* 参考来源 */
+.srcs{list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.src{
+  display:flex; gap:10px; border:1px solid var(--line-soft); border-radius:var(--r-md);
+  padding:11px 13px; background:#fff; box-shadow:var(--sh); transition:transform .2s, box-shadow .2s;
+}
+.src:hover{transform:translateY(-4px); box-shadow:var(--sh-hover)}
+.src.flash{border-color:var(--blurple); background:rgba(99,91,255,.05)}
+.s-no{flex:none; font-family:var(--mono); font-size:12px; font-weight:700; color:var(--blurple-deep); background:rgba(99,91,255,.08); border:1px solid rgba(99,91,255,.3); border-radius:6px; height:22px; padding:0 6px; display:flex; align-items:center; font-variant-numeric:tabular-nums}
+.s-main{min-width:0; flex:1}
+.s-title{font-size:13px; font-weight:600; color:var(--ink); line-height:1.45; display:flex; align-items:flex-start; gap:6px}
+.s-title .ext{flex:none; margin-top:2px}
+.s-meta{display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; font-size:11.5px; color:var(--sub)}
+.s-meta code{font-family:var(--mono); font-size:11px; color:var(--sub); background:var(--page-alt); border:1px solid var(--line-soft); border-radius:5px; padding:1px 5px}
+.tag{border-radius:999px; padding:2px 9px; font-weight:700; font-size:11px}
+.tag-kb{color:var(--blurple-deep); border:1px solid rgba(99,91,255,.45); background:rgba(99,91,255,.06)}
+.tag-web{color:#0B7EA4; border:1px solid rgba(0,212,255,.5); background:rgba(0,212,255,.08)}
+.rel{margin-left:auto; font-variant-numeric:tabular-nums; font-family:var(--mono); font-weight:700; color:var(--ink)}
+.rel small{color:var(--sub); font-weight:400; font-family:var(--sans); margin-right:3px}
+
+/* 引用图片 */
+.imgs{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
+.img-ph{
+  border:1px solid var(--line-soft); border-radius:var(--r-md); overflow:hidden; background:var(--page-alt);
+  box-shadow:var(--sh); transition:transform .2s, box-shadow .2s;
+}
+.img-ph:hover{transform:translateY(-4px); box-shadow:var(--sh-hover)}
+.img-ph svg{display:block; width:100%; height:auto}
+.img-ph figcaption{font-size:11.5px; color:var(--sub); text-align:center; padding:6px 0; border-top:1px solid var(--line-soft); background:#fff}
+
+/* 折叠面板 */
+.collapse{border:1px solid var(--line-soft); border-radius:var(--r-md); background:var(--page-alt); margin-top:16px; overflow:hidden}
+.collapse-btn{
+  width:100%; display:flex; align-items:center; gap:10px; text-align:left;
+  background:transparent; border:none; padding:12px 15px; font-size:13.5px; font-weight:700; color:var(--ink);
+}
+.collapse-btn:hover{background:rgba(99,91,255,.05)}
+.chev{margin-left:auto; transition:transform .25s; flex:none}
+.collapse-btn[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.collapse-body{padding:4px 15px 14px; border-top:1px dashed var(--line)}
+.collapse-body[hidden]{display:none}
+.node{display:flex; align-items:center; gap:10px; padding:6px 0; font-size:13px; color:var(--body)}
+.node .ok-i{flex:none}
+.node .nt{margin-left:auto; font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:12px; color:var(--sub)}
+
+/* 追问 */
+.ask{background:#FFF7FA; border:1px solid rgba(255,92,153,.35); border-radius:var(--r-md); padding:13px 16px; font-size:13.5px; color:var(--ink); margin-top:16px}
+.chips{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
+.chip{
+  border:1.5px solid var(--blurple); color:var(--blurple-deep); background:rgba(99,91,255,.05);
+  border-radius:999px; padding:5px 14px; font-size:12.5px; font-weight:700; transition:all .2s;
+}
+.chip:hover{background:var(--blurple); color:#fff; transform:translateY(-2px)}
+
+/* composer */
+.composer{border-top:1px solid var(--line-soft); padding:16px 22px; display:flex; gap:12px; align-items:flex-end; background:#fff; border-radius:0 0 var(--r-lg) var(--r-lg)}
+.composer textarea{
+  flex:1; resize:vertical; min-height:52px; max-height:160px; font-family:inherit; font-size:14px;
+  color:var(--body); border:1.5px solid var(--line); border-radius:var(--r-md); padding:12px 14px; background:var(--page-alt);
+  transition:border-color .2s, box-shadow .2s;
+}
+.composer textarea:focus{border-color:var(--blurple); box-shadow:0 0 0 3px rgba(99,91,255,.15); background:#fff; outline:none}
+.send{
+  flex:none; background:var(--blurple); border:none; color:#fff; border-radius:var(--r-md);
+  padding:13px 20px; font-size:14.5px; font-weight:800; display:flex; align-items:center; gap:8px;
+  box-shadow:0 1px 2px rgba(10,37,64,.1), 0 6px 20px rgba(99,91,255,.3); transition:all .2s;
+}
+.send:hover{transform:translateY(-2px); background:#5750F1}
+.send:active{transform:translateY(0)}
+.keys{width:100%; display:flex; gap:12px; font-size:11.5px; color:var(--sub); margin-top:4px}
+.keys kbd{font-family:var(--mono); background:var(--page-alt); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 6px; font-size:10.5px}
+.comp-grid{flex:1; display:flex; flex-direction:column}
+
+/* ---------- import ---------- */
+.imp-grid{display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:20px; align-items:start}
+.drop{
+  border:2px dashed rgba(99,91,255,.45); border-radius:var(--r-lg); background:var(--page-alt);
+  padding:34px 20px; text-align:center; color:var(--sub); transition:all .2s; cursor:pointer; display:block; width:100%;
+}
+.drop:hover, .drop:focus-visible{border-color:var(--blurple); background:rgba(99,91,255,.06); transform:translateY(-2px)}
+.drop b{display:block; color:var(--ink); font-size:15px; font-weight:800; margin-top:10px}
+.drop small{font-size:12px}
+.file{
+  display:flex; gap:14px; align-items:center; border:1px solid var(--line-soft); border-radius:var(--r-md);
+  background:#fff; padding:15px 17px; box-shadow:var(--sh); transition:transform .2s, box-shadow .2s; margin-bottom:12px;
+}
+.file:hover{transform:translateY(-4px); box-shadow:var(--sh-hover)}
+.f-ico{flex:none; width:40px; height:40px; border-radius:var(--r-sm); display:flex; align-items:center; justify-content:center; background:rgba(99,91,255,.08); border:1px solid rgba(99,91,255,.18)}
+.f-main{flex:1; min-width:0}
+.f-name{font-size:14px; font-weight:700; color:var(--ink); word-break:break-all}
+.f-sub{font-size:12px; color:var(--sub); margin-top:2px; display:flex; gap:10px; flex-wrap:wrap; font-variant-numeric:tabular-nums}
+.f-prog{height:6px; border-radius:999px; background:rgba(10,37,64,.08); margin-top:9px; overflow:hidden}
+.f-prog i{display:block; height:100%; border-radius:999px; background:linear-gradient(90deg, var(--blurple), var(--purple) 55%, var(--cyan))}
+.f-prog.err i{background:var(--err)}
+.f-right{flex:none; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:8px}
+.badge{border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:800; display:inline-flex; align-items:center; gap:6px; white-space:nowrap}
+.badge i{width:7px; height:7px; border-radius:50%}
+.b-done{color:#067A46; background:rgba(14,212,126,.1); border:1px solid rgba(14,212,126,.5)} .b-done i{background:var(--ok)}
+.b-fail{color:var(--err); background:rgba(223,27,81,.07); border:1px solid rgba(223,27,81,.4)} .b-fail i{background:var(--err)}
+.b-proc{color:var(--blurple-deep); background:rgba(99,91,255,.08); border:1px solid rgba(99,91,255,.4)} .b-proc i{background:var(--blurple)}
+.b-up{color:var(--sub); background:var(--page-alt); border:1px solid var(--line)} .b-up i{background:#829AB1}
+.f-links{display:flex; gap:8px}
+.fl{font-size:12px; font-weight:700; color:var(--blurple-deep); background:#fff; border:1.5px solid rgba(99,91,255,.4); border-radius:7px; padding:4px 11px; transition:all .2s; text-decoration:none; display:inline-flex; align-items:center; gap:5px}
+.fl:hover{background:var(--blurple); border-color:var(--blurple); color:#fff; transform:translateY(-2px)}
+.f-err{font-size:12.5px; color:var(--err); font-weight:600; background:rgba(223,27,81,.06); border:1px solid rgba(223,27,81,.28); border-radius:7px; padding:6px 10px; margin-top:8px; display:flex; gap:7px; align-items:center}
+.f-cut{font-size:12px; color:var(--ink); font-weight:700; font-variant-numeric:tabular-nums}
+.log-line{display:flex; align-items:center; gap:9px; padding:6px 0; font-size:13px; border-bottom:1px dashed var(--line-soft)}
+.log-line:last-child{border-bottom:none}
+.log-line .lt{margin-left:auto; font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:700; font-size:12.5px; color:var(--ink)}
+.log-line.warn .lt{color:var(--err)}
+.backend{
+  display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--sub);
+  background:var(--page-alt); border:1px solid var(--line-soft); border-radius:var(--r-md); padding:10px 14px; margin-top:4px;
+}
+.backend code{font-family:var(--mono); font-size:12px; color:var(--blurple-deep); background:#fff; border:1px solid var(--line); border-radius:6px; padding:2px 8px}
+.side-card{padding:18px 20px}
+.side-card .sec-t{margin-top:0}
+.mini-stats{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px}
+.mini{border:1px solid var(--line-soft); border-radius:var(--r-sm); padding:10px 12px; background:var(--page-alt)}
+.mini b{display:block; font-size:20px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.3px}
+.mini span{font-size:11.5px; color:var(--sub)}
+
+/* ---------- 底部数据条 ---------- */
+.metrics{max-width:1200px; margin:0 auto; padding:0 32px 46px; display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+.metric{
+  background:#fff; border:1px solid var(--line-soft); border-radius:var(--r-lg); box-shadow:var(--sh);
+  padding:22px 24px; transition:transform .2s, box-shadow .2s; position:relative; overflow:hidden;
+}
+.metric::before{content:""; position:absolute; inset:0 0 auto 0; height:3px; background:linear-gradient(90deg, var(--blurple), var(--purple), var(--cyan))}
+.metric:hover{transform:translateY(-4px); box-shadow:var(--sh-hover)}
+.metric .mv{font-size:34px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.5px; line-height:1.15}
+.metric .mv small{font-size:15px; font-weight:700; color:var(--sub); margin-left:4px}
+.metric .mk{font-size:13px; color:var(--sub); font-weight:600; margin-top:4px}
+footer{border-top:1px solid var(--line-soft); padding:22px 32px 30px; text-align:center; font-size:12.5px; color:var(--sub); background:var(--page-alt)}
+
+/* ---------- 响应式 ---------- */
+@media (max-width:1024px){
+  .srcs{grid-template-columns:1fr}
+  .imp-grid{grid-template-columns:1fr}
+  .hero{padding-top:44px}
+}
+@media (max-width:768px){
+  :root{--cut:clamp(26px, 3.4vw, 44px)}
+  main{padding:8px 18px 32px}
+  .nav{padding:14px 18px 0}
+  .hero{padding:40px 18px 8px}
+  h1{font-size:36px}
+  .metrics{padding:0 18px 36px; gap:14px}
+  .metric .mv{font-size:28px}
+  .msgs{padding:18px 14px}
+  .composer{padding:14px}
+  .f-right{align-items:flex-start}
+  .file{flex-wrap:wrap}
+}
+@media (max-width:390px){
+  :root{--cut:18px}
+  .nav-inner{flex-direction:column; align-items:flex-start; gap:8px}
+  .head-sp, .nav-sp{display:none}
+  h1{font-size:30px}
+  .hero-sub{font-size:14px}
+  .hero-cta .solid-btn, .hero-cta .outline-btn{width:100%; justify-content:center; text-align:center}
+  .tabs{width:100%}
+  .tab{flex:1; justify-content:center; padding:9px 10px; font-size:14px}
+  .metrics{grid-template-columns:1fr}
+  .imgs{grid-template-columns:repeat(2,1fr)}
+  .mini-stats{grid-template-columns:1fr}
+  .status{font-size:12px}
+  .keys{flex-wrap:wrap; gap:6px}
+}
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{transition:none !important; animation:none !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= HERO：mesh gradient + 斜切 ================= -->
+<div class="hero-wrap">
+  <header class="nav">
+    <div class="nav-inner">
+      <div class="logo">
+        <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+          <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#00D4FF"/><stop offset=".55" stop-color="#635BFF"/><stop offset="1" stop-color="#A960FF"/>
+          </linearGradient></defs>
+          <rect x="2" y="4" width="22" height="18" rx="4" fill="none" stroke="url(#lg)" stroke-width="2.4"/>
+          <path d="M7 10h7M7 14h12" stroke="url(#lg)" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        BOSS智库知识库
+      </div>
+      <span class="status"><span class="dot" aria-hidden="true"></span>在线 · 可查询知识库与联网信息</span>
+      <span class="nav-sp"></span>
+      <nav class="nav-actions" aria-label="主操作">
+        <button class="ghost-btn" data-goto="chat">知识检索</button>
+        <button class="ghost-btn" data-goto="import">文档导入</button>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" aria-label="方案标语">
+    <span class="eyebrow"><i aria-hidden="true"></i>企业级智能知识库 · RAG 工作流</span>
+    <h1>让企业知识库自己回答业务问题</h1>
+    <p class="hero-sub">多路召回 · 重排序 · 引用可溯源。检索链路每一步都清晰计费般透明呈现，答案带出处，进度可折叠查看。</p>
+    <div class="hero-cta">
+      <button class="solid-btn" data-goto="chat">开始智能检索
+        <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true" style="vertical-align:-2px"><path d="M3 7.5h8M8 4l3.5 3.5L8 11" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="outline-btn" data-goto="import">导入文档构建切片</button>
+    </div>
+    <div class="hero-meta" aria-hidden="true">
+      <span><b class="num">7</b>个检索节点全链路</span>
+      <span><b class="num">0.98+</b>典型相关度</span>
+      <span><b class="num">8</b>路参考来源融合</span>
+    </div>
+  </section>
+</div>
+
+<main>
+  <!-- ================= Tab 切换 ================= -->
+  <div class="tabs" role="tablist" aria-label="模块切换">
+    <button class="tab" id="tab-chat" role="tab" aria-selected="true" aria-controls="panel-chat">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12v8H9l-3 2.5v-2.5H2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      知识检索 Chat
+    </button>
+    <button class="tab" id="tab-import" role="tab" aria-selected="false" aria-controls="panel-import">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2M4.5 5.5L8 2l3.5 3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      文档导入
+    </button>
+  </div>
+
+  <!-- ================= 2.1 Chat 模块 ================= -->
+  <section class="card panel" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
+    <div class="chat-head">
+      <span class="chat-title">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14v9h-7l-3.5 3v-3H2z" fill="none" stroke="#635BFF" stroke-width="1.7" stroke-linejoin="round"/><path d="M5.5 7.5h7M5.5 10h4.5" stroke="#635BFF" stroke-width="1.5" stroke-linecap="round"/></svg>
+        BOSS智库知识库
+      </span>
+      <span class="status"><span class="dot" aria-hidden="true"></span>在线 · 可查询知识库与联网信息</span>
+      <span class="head-sp"></span>
+      <label class="switch">
+        <input type="checkbox" id="stream-toggle" checked>
+        <span class="track" aria-hidden="true"></span>流式输出
+      </label>
+      <button class="danger-ghost" id="clear-btn" type="button">清空对话</button>
+    </div>
+
+    <div class="msgs" id="msgs">
+      <div class="welcome">
+        你好，我是BOSS智库知识库客服。你可以直接提问，我会在"阶段进度"里展示处理过程。
+        <div class="hint">可以问 <b>"如何使用万用表测量电压？"</b></div>
+      </div>
+
+      <div class="msg user">
+        <div>
+          <div class="bubble-u">在《Coze 工作流实战：商家客服初级》案例中，意图识别节点后面一共分了几条支路？</div>
+          <div class="time num">20:23</div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="avatar" aria-hidden="true">B</div>
+        <div class="msg-b">
+          <div class="b-name">BOSS智库 <time class="num">20:24</time></div>
+          <div class="answer">
+            <p>在《Coze 工作流实战：商家客服初级》案例中，意图识别节点后面一共分了 <strong>3 条支路</strong>：售前、售后、兜底<button class="cite" data-target="src-2" aria-label="跳转到参考来源 2">2</button><button class="cite" data-target="src-3" aria-label="跳转到参考来源 3">3</button>。</p>
+            <ol>
+              <li><strong>售前支路</strong>：对应意图 <code>branch_0</code>，处理商品、活动、发货咨询，含商品查询（循环校验）与优惠咨询<button class="cite" data-target="src-2" aria-label="跳转到参考来源 2">2</button>；</li>
+              <li><strong>售后支路</strong>：对应意图 <code>branch_1</code>，处理退换货、质量纠纷、退款<button class="cite" data-target="src-3" aria-label="跳转到参考来源 3">3</button>；</li>
+              <li><strong>兜底支路</strong>：对应 <code>default</code>，无法匹配时进入大模型陪聊并挂载插件<button class="cite" data-target="src-5" aria-label="跳转到参考来源 5">5</button>。</li>
+            </ol>
+          </div>
+
+          <div class="sec-t"><span class="bar" aria-hidden="true"></span>参考来源（8）</div>
+          <ul class="srcs">
+            <li class="src" id="src-1"><span class="s-no">[1]</span><div class="s-main">
+              <div class="s-title">《Coze 工作流实战：商家客服初级》· 意图识别节点路由总览</div>
+              <div class="s-meta"><span class="tag tag-kb">知识库</span><code>chunk_id=ck-1840217</code><span class="rel"><small>相关度</small>0.9873</span></div>
+            </div></li>
+            <li class="src" id="src-2"><span class="s-no">[2]</span><div class="s-main">
+              <div class="s-title">《Coze 工作流实战：商家客服初级》· 售前支路 branch_0 商品查询与优惠咨询</div>
+              <div class="s-meta"><span class="tag tag-kb">知识库</span><code>chunk_id=ck-1840231</code><span class="rel"><small>相关度</small>0.9841</span></div>
+            </div></li>
+            <li class="src" id="src-3"><span class="s-no">[3]</span><div class="s-main">
+              <div class="s-title">《Coze 工作流实战：商家客服初级》· 售后支路 branch_1 与兜底 default 定义</div>
+              <div class="s-meta"><span class="tag tag-kb">知识库</span><code>chunk_id=ck-1840246</code><span class="rel"><small>相关度</small>0.9812</span></div>
+            </div></li>
+            <li class="src" id="src-4"><span class="s-no">[4]</span><div class="s-main">
+              <div class="s-title">HAK180 商家客服操作手册 · 工作流分支配置实录</div>
+              <div class="s-meta"><span class="tag tag-kb">知识库</span><code>chunk_id=ck-1840302</code><span class="rel"><small>相关度</small>0.9768</span></div>
+            </div></li>
+            <li class="src" id="src-5"><span class="s-no">[5]</span><div class="s-main">
+              <div class="s-title">Coze 工作流从入门到精通系列3：看工作流如何玩转内容创作与智能客服 - 火山引擎
+                <svg class="ext" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5h5v5M9.5 2.5L4 8" fill="none" stroke="#425466" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 4.5h-5v6h6v-5" fill="none" stroke="#425466" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="s-meta"><span class="tag tag-web">联网</span><code>volcengine.com</code><span class="rel"><small>相关度</small>0.9695</span></div>
+            </div></li>
+            <li class="src" id="src-6"><span class="s-no">[6]</span><div class="s-main">
+              <div class="s-title">Coze工作流实战：快速搭建网站的智能客服助手 - 博客园
+                <svg class="ext" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5h5v5M9.5 2.5L4 8" fill="none" stroke="#425466" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 4.5h-5v6h6v-5" fill="none" stroke="#425466" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="s-meta"><span class="tag tag-web">联网</span><code>cnblogs.com</code><span class="rel"><small>相关度</small>0.9642</span></div>
+            </div></li>
+            <li class="src" id="src-7"><span class="s-no">[7]</span><div class="s-main">
+              <div class="s-title">探秘 AI Agent 之 Coze 智能体：工作流模式 - 腾讯云开发者社区
+                <svg class="ext" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5h5v5M9.5 2.5L4 8" fill="none" stroke="#425466" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 4.5h-5v6h6v-5" fill="none" stroke="#425466" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="s-meta"><span class="tag tag-web">联网</span><code>cloud.tencent.com</code><span class="rel"><small>相关度</small>0.9587</span></div>
+            </div></li>
+            <li class="src" id="src-8"><span class="s-no">[8]</span><div class="s-main">
+              <div class="s-title">零基础Coze与Dify教程，Agent智能体项目实战 - bilibili
+                <svg class="ext" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5h5v5M9.5 2.5L4 8" fill="none" stroke="#425466" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 4.5h-5v6h6v-5" fill="none" stroke="#425466" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="s-meta"><span class="tag tag-web">联网</span><code>bilibili.com</code><span class="rel"><small>相关度</small>0.9521</span></div>
+            </div></li>
+          </ul>
+
+          <div class="sec-t"><span class="bar" aria-hidden="true"></span>引用图片</div>
+          <div class="imgs">
+            <figure class="img-ph"><svg viewBox="0 0 200 120" role="img" aria-label="参考图片占位 1"><rect width="200" height="120" fill="#F6FBFF"/><rect x="18" y="20" width="164" height="80" rx="8" fill="none" stroke="#635BFF" stroke-opacity=".35" stroke-width="2"/><circle cx="52" cy="46" r="8" fill="#00D4FF" opacity=".5"/><path d="M30 88l40-28 28 20 22-16 30 24" fill="none" stroke="#A960FF" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><figcaption>参考图片</figcaption></figure>
+            <figure class="img-ph"><svg viewBox="0 0 200 120" role="img" aria-label="参考图片占位 2"><rect width="200" height="120" fill="#F6FBFF"/><rect x="24" y="18" width="152" height="84" rx="8" fill="none" stroke="#635BFF" stroke-opacity=".35" stroke-width="2"/><path d="M44 74h26V50h22v24h26V38h22v36" fill="none" stroke="#635BFF" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><figcaption>参考图片</figcaption></figure>
+            <figure class="img-ph"><svg viewBox="0 0 200 120" role="img" aria-label="参考图片占位 3"><rect width="200" height="120" fill="#F6FBFF"/><rect x="20" y="22" width="70" height="52" rx="7" fill="none" stroke="#00D4FF" stroke-opacity=".55" stroke-width="2"/><rect x="110" y="22" width="70" height="52" rx="7" fill="none" stroke="#FF5C99" stroke-opacity=".5" stroke-width="2"/><path d="M90 48h20" stroke="#635BFF" stroke-opacity=".6" stroke-width="2.4" stroke-linecap="round"/></svg><figcaption>参考图片</figcaption></figure>
+            <figure class="img-ph"><svg viewBox="0 0 200 120" role="img" aria-label="参考图片占位 4"><rect width="200" height="120" fill="#F6FBFF"/><circle cx="100" cy="58" r="30" fill="none" stroke="#635BFF" stroke-opacity=".45" stroke-width="2"/><circle cx="100" cy="58" r="14" fill="none" stroke="#A960FF" stroke-opacity=".55" stroke-width="2.4"/><path d="M100 14v14M100 88v14" stroke="#00D4FF" stroke-opacity=".6" stroke-width="2.4" stroke-linecap="round"/></svg><figcaption>参考图片</figcaption></figure>
+          </div>
+
+          <div class="collapse">
+            <button class="collapse-btn" aria-expanded="false" data-body="stage-progress">
+              阶段进度（已完成7，进行中0，状态：已完成）
+              <svg class="chev" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 5.5L7 9.5l4-4" fill="none" stroke="#425466" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="collapse-body" id="stage-progress" hidden>
+              <div class="node"><svg class="ok-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="7" fill="#0ED47E" opacity=".15"/><path d="M4.5 7.8l2 2 4-4.6" fill="none" stroke="#067A46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>确认问题产品<span class="nt">0.42s</span></div>
+              <div class="node"><svg class="ok-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="7" fill="#0ED47E" opacity=".15"/><path d="M4.5 7.8l2 2 4-4.6" fill="none" stroke="#067A46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>切片搜索<span class="nt">1.18s</span></div>
+              <div class="node"><svg class="ok-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="7" fill="#0ED47E" opacity=".15"/><path d="M4.5 7.8l2 2 4-4.6" fill="none" stroke="#067A46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>切片搜索(假设性文档)<span class="nt">2.05s</span></div>
+              <div class="node"><svg class="ok-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="7" fill="#0ED47E" opacity=".15"/><path d="M4.5 7.8l2 2 4-4.6" fill="none" stroke="#067A46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>网络搜索<span class="nt">3.27s</span></div>
+              <div class="node"><svg class="ok-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="7" fill="#0ED47E" opacity=".15"/><path d="M4.5 7.8l2 2 4-4.6" fill="none" stroke="#067A46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>倒排融合<span class="nt">0.36s</span></div>
+              <div class="node"><svg class="ok-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="7" fill="#0ED47E" opacity=".15"/><path d="M4.5 7.8l2 2 4-4.6" fill="none" stroke="#067A46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>重排序<span class="nt">1.89s</span></div>
+              <div class="node"><svg class="ok-i" width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="7" fill="#0ED47E" opacity=".15"/><path d="M4.5 7.8l2 2 4-4.6" fill="none" stroke="#067A46" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>生成答案<span class="nt">8.20s</span></div>
+            </div>
+          </div>
+
+          <div class="ask">
+            您是想问以下哪个产品：HAK180、Hak180、Coze 工作流实战:商家客服初级？请明确一下型号。
+            <div class="chips">
+              <button class="chip" data-fill="HAK180 是什么产品？">HAK180</button>
+              <button class="chip" data-fill="Hak180 的说明书里怎么讲？">Hak180</button>
+              <button class="chip" data-fill="展开讲讲 Coze 工作流实战:商家客服初级 的兜底支路">Coze 工作流实战:商家客服初级</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="comp-grid">
+        <textarea id="input" rows="2" placeholder="请输入问题（Enter 发送，Shift+Enter 换行）" aria-label="输入问题"></textarea>
+        <div class="keys"><span><kbd>Enter</kbd> 发送</span><span><kbd>Shift+Enter</kbd> 换行</span></div>
+      </div>
+      <button class="send" id="send-btn" type="button" aria-label="发送问题">
+        发送
+        <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><path d="M2.5 7.5h9M8 3.5l4 4-4 4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ================= 2.2 导入模块 ================= -->
+  <section class="card panel" id="panel-import" role="tabpanel" aria-labelledby="tab-import" hidden style="padding:22px">
+    <div class="imp-grid">
+      <div>
+        <button class="drop" type="button" aria-label="点击或拖拽文件上传">
+          <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+            <path d="M17 23V8M10 14.5L17 8l7 6.5" fill="none" stroke="#635BFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 27h22" stroke="#A960FF" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          <b>点击或拖拽文件到此处 (PDF/MD)</b>
+          <small>单文件建议 ≤ 50 MB，导入后自动切分并向量化</small>
+        </button>
+
+        <div class="sec-t"><span class="bar" aria-hidden="true"></span>文件列表（5）</div>
+
+        <div class="file">
+          <span class="f-ico"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l3 3v13H5z" fill="none" stroke="#635BFF" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 9h4M8 12h4" stroke="#635BFF" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+          <div class="f-main">
+            <div class="f-name">03-商家客服初级.pdf</div>
+            <div class="f-sub"><span>1.7 MB</span><span>上传于 08:42</span><span class="f-cut">切片数：17</span></div>
+            <div class="f-prog" role="img" aria-label="进度 100%"><i style="width:100%"></i></div>
+          </div>
+          <div class="f-right">
+            <span class="badge b-done"><i aria-hidden="true"></i>已完成</span>
+            <div class="f-links">
+              <a class="fl" href="#panel-import">查看Markdown</a>
+              <a class="fl" href="#panel-import">下载Markdown</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="file">
+          <span class="f-ico"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l3 3v13H5z" fill="none" stroke="#635BFF" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 9h4M8 12h4" stroke="#635BFF" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+          <div class="f-main">
+            <div class="f-name">sample.pdf</div>
+            <div class="f-sub"><span>0.7 KB</span><span>上传于 08:43</span><span class="f-cut">切片数：1</span></div>
+            <div class="f-prog" role="img" aria-label="进度 100%"><i style="width:100%"></i></div>
+          </div>
+          <div class="f-right">
+            <span class="badge b-done"><i aria-hidden="true"></i>已完成</span>
+            <div class="f-links"><a class="fl" href="#panel-import">查看Markdown</a></div>
+          </div>
+        </div>
+
+        <div class="file">
+          <span class="f-ico"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l3 3v13H5z" fill="none" stroke="#635BFF" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 9h4M8 12h4" stroke="#635BFF" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+          <div class="f-main">
+            <div class="f-name">HAK180维修手册.pdf</div>
+            <div class="f-sub"><span>3.1 MB</span><span>上传于 09:05</span><span>当前节点：向量生成</span></div>
+            <div class="f-prog" role="img" aria-label="进度 62%"><i style="width:62%"></i></div>
+          </div>
+          <div class="f-right"><span class="badge b-proc"><i aria-hidden="true"></i>处理中</span><span class="num" style="font-size:12px;color:var(--sub)">62%</span></div>
+        </div>
+
+        <div class="file">
+          <span class="f-ico"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l3 3v13H5z" fill="none" stroke="#635BFF" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 9h4M8 12h4" stroke="#635BFF" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+          <div class="f-main">
+            <div class="f-name">Hak180快速入门.md</div>
+            <div class="f-sub"><span>12 KB</span><span>上传于 09:12</span></div>
+            <div class="f-prog" role="img" aria-label="进度 18%"><i style="width:18%"></i></div>
+          </div>
+          <div class="f-right"><span class="badge b-up"><i aria-hidden="true"></i>上传中</span><span class="num" style="font-size:12px;color:var(--sub)">18%</span></div>
+        </div>
+
+        <div class="file">
+          <span class="f-ico"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l3 3v13H5z" fill="none" stroke="#DF1B51" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.5 8.5l3 3M11.5 8.5l-3 3" stroke="#DF1B51" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+          <div class="f-main">
+            <div class="f-name">损坏文件.pdf</div>
+            <div class="f-sub"><span>2.3 MB</span><span>上传于 08:57</span></div>
+            <div class="f-err">
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5L13 12H1z" fill="none" stroke="#DF1B51" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 5.5v3M7 10v.6" stroke="#DF1B51" stroke-width="1.5" stroke-linecap="round"/></svg>
+              PDF 加密或无法解析，已中止导入
+            </div>
+            <div class="f-prog err" role="img" aria-label="进度中止于 12%"><i style="width:12%"></i></div>
+          </div>
+          <div class="f-right"><span class="badge b-fail"><i aria-hidden="true"></i>失败</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card side-card">
+          <div class="sec-t"><span class="bar" aria-hidden="true"></span>入库概览</div>
+          <div class="mini-stats">
+            <div class="mini"><b class="num">19</b><span>已入库文档</span></div>
+            <div class="mini"><b class="num">44</b><span>知识切片</span></div>
+            <div class="mini"><b class="num">16.7 MB</b><span>累计体积</span></div>
+            <div class="mini"><b class="num">1</b><span>失败任务</span></div>
+          </div>
+        </div>
+
+        <div class="collapse" style="margin-top:16px">
+          <button class="collapse-btn" aria-expanded="false" data-body="node-log">
+            节点执行日志（最近一次成功导入）
+            <svg class="chev" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 5.5L7 9.5l4-4" fill="none" stroke="#425466" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="collapse-body" id="node-log" hidden>
+            <div class="log-line"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#0ED47E" stroke-width="1.6"/><path d="M4.6 7.2l1.7 1.7 3-3.6" fill="none" stroke="#067A46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>检查文件<span class="lt">0.12s</span></div>
+            <div class="log-line"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#0ED47E" stroke-width="1.6"/><path d="M4.6 7.2l1.7 1.7 3-3.6" fill="none" stroke="#067A46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF转Markdown<span class="lt">33.59s</span></div>
+            <div class="log-line"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#0ED47E" stroke-width="1.6"/><path d="M4.6 7.2l1.7 1.7 3-3.6" fill="none" stroke="#067A46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Markdown图片处理<span class="lt">943.98s</span></div>
+            <div class="log-line"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#0ED47E" stroke-width="1.6"/><path d="M4.6 7.2l1.7 1.7 3-3.6" fill="none" stroke="#067A46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>文档切分<span class="lt">1.87s</span></div>
+            <div class="log-line"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#0ED47E" stroke-width="1.6"/><path d="M4.6 7.2l1.7 1.7 3-3.6" fill="none" stroke="#067A46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>主体名称识别<span class="lt">2.44s</span></div>
+            <div class="log-line"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#0ED47E" stroke-width="1.6"/><path d="M4.6 7.2l1.7 1.7 3-3.6" fill="none" stroke="#067A46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>向量生成<span class="lt">72.58s</span></div>
+            <div class="log-line"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#0ED47E" stroke-width="1.6"/><path d="M4.6 7.2l1.7 1.7 3-3.6" fill="none" stroke="#067A46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>导入向量库<span class="lt">5.39s</span></div>
+            <div class="log-line"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#0ED47E" stroke-width="1.6"/><path d="M4.6 7.2l1.7 1.7 3-3.6" fill="none" stroke="#067A46" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>处理完成<span class="lt">0.03s</span></div>
+            <div class="log-line warn"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="#DF1B51" stroke-width="1.6"/><path d="M5 5l4 4M9 5l-4 4" stroke="#DF1B51" stroke-width="1.5" stroke-linecap="round"/></svg>损坏文件.pdf · 检查文件失败<span class="lt">0.09s</span></div>
+          </div>
+        </div>
+
+        <div class="backend" style="margin-top:16px">
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><rect x="1.5" y="2.5" width="12" height="4" rx="1.2" fill="none" stroke="#635BFF" stroke-width="1.5"/><rect x="1.5" y="8.5" width="12" height="4" rx="1.2" fill="none" stroke="#635BFF" stroke-width="1.5"/><circle cx="4.3" cy="4.5" r=".9" fill="#0ED47E"/><circle cx="4.3" cy="10.5" r=".9" fill="#0ED47E"/></svg>
+          后端接口地址：<code>http://127.0.0.1:8000</code>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ================= 底部数据条 ================= -->
+<section class="metrics" aria-label="平台运行指标">
+  <div class="metric"><div class="mv num">19</div><div class="mk">文档数</div></div>
+  <div class="metric"><div class="mv num">44</div><div class="mk">切片数</div></div>
+  <div class="metric"><div class="mv num">8.2<small>s</small></div><div class="mk">平均首字延迟</div></div>
+</section>
+
+<footer>© 2026 BOSS智库 · 企业级智能知识库系统 · 方案05 Stripe 金融科技流体渐变风</footer>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s,el){return (el||document).querySelector(s)};
+  var $$=function(s,el){return Array.prototype.slice.call((el||document).querySelectorAll(s))};
+
+  /* ---- Tab 切换 ---- */
+  function selectTab(name){
+    $$('.tab').forEach(function(t){
+      var on=t.id==='tab-'+name;
+      t.setAttribute('aria-selected',on?'true':'false');
+      $('#panel-'+name).hidden=!on;
+    });
+  }
+  $$('.tab').forEach(function(t){t.addEventListener('click',function(){selectTab(t.id.replace('tab-',''))})});
+  $$('[data-goto]').forEach(function(b){b.addEventListener('click',function(){
+    selectTab(b.getAttribute('data-goto'));
+    $('.tabs').scrollIntoView({behavior:'smooth',block:'start'});
+  })});
+
+  /* ---- 折叠面板（阶段进度 / 节点日志） ---- */
+  $$('.collapse-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var body=$('#'+btn.getAttribute('data-body'));
+      var open=btn.getAttribute('aria-expanded')==='true';
+      btn.setAttribute('aria-expanded',open?'false':'true');
+      body.hidden=open;
+    });
+  });
+
+  /* ---- 引用 chip 点击定位 ---- */
+  document.addEventListener('click',function(e){
+    var c=e.target.closest ? e.target.closest('.cite') : null;
+    if(!c)return;
+    var t=document.getElementById(c.getAttribute('data-target'));
+    if(!t)return;
+    t.scrollIntoView({behavior:'smooth',block:'center'});
+    t.classList.add('flash');
+    setTimeout(function(){t.classList.remove('flash')},1200);
+  });
+
+  /* ---- 型号 chips 填入输入框 ---- */
+  $$('.chip').forEach(function(ch){ch.addEventListener('click',function(){
+    var ta=$('#input'); ta.value=ch.getAttribute('data-fill'); ta.focus();
+  })});
+
+  /* ---- 发送：模拟流式追加 ---- */
+  var msgs=$('#msgs'), timer=null;
+  var CANNED='根据知识库与联网检索：在《Coze 工作流实战：商家客服初级》案例中，意图识别节点后共 3 条支路 —— branch_0 售前（商品/活动/发货咨询，含商品循环校验与优惠咨询）、branch_1 售后（退换货、质量纠纷、退款）、default 兜底（大模型陪聊并挂载插件）。完整来源见上方"参考来源（8）"。';
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  function now(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+  function send(){
+    var ta=$('#input'), v=ta.value.trim();
+    if(!v){ta.focus();return}
+    if(timer){clearInterval(timer);timer=null}
+    var u=document.createElement('div'); u.className='msg user';
+    u.innerHTML='<div><div class="bubble-u">'+esc(v)+'</div><div class="time num">'+now()+'</div></div>';
+    msgs.appendChild(u); ta.value='';
+    var b=document.createElement('div'); b.className='msg';
+    b.innerHTML='<div class="avatar" aria-hidden="true">B</div><div class="msg-b"><div class="b-name">BOSS智库 <time class="num">'+now()+'</time></div><p class="answer" style="margin:0"></p></div>';
+    msgs.appendChild(b);
+    var out=$('.answer',b);
+    msgs.scrollTop=msgs.scrollHeight;
+    if($('#stream-toggle').checked){
+      var i=0;
+      timer=setInterval(function(){
+        i+=6; out.textContent=CANNED.slice(0,i);
+        msgs.scrollTop=msgs.scrollHeight;
+        if(i>=CANNED.length){clearInterval(timer);timer=null}
+      },28);
+    }else{
+      out.textContent=CANNED;
+    }
+  }
+  $('#send-btn').addEventListener('click',send);
+  $('#input').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}
+  });
+
+  /* ---- 清空对话（保留欢迎语） ---- */
+  var initial=msgs.innerHTML;
+  $('#clear-btn').addEventListener('click',function(){
+    if(timer){clearInterval(timer);timer=null}
+    msgs.innerHTML=initial;
+  });
+})();
+</script>
+</body>
+</html>
